@@ -1,23 +1,3 @@
-# Build the image
-# from root directory
-# CPU
-# docker build --platform=linux/amd64 -t neuronpedia-autointerp:cpu -f apps/autointerp/Dockerfile --build-arg BUILD_TYPE=nocuda .
-# GPU
-# docker build --platform=linux/amd64 -t neuronpedia-autointerp:gpu -f apps/autointerp/Dockerfile --build-arg BUILD_TYPE=cuda .
-
-# Push the image to the registry
-# docker tag neuronpedia-autointerp:cpu gcr.io/tokyo-griffin-401620/neuronpedia-autointerp:cpu
-# docker tag neuronpedia-autointerp:gpu gcr.io/tokyo-griffin-401620/neuronpedia-autointerp:gpu
-# docker push gcr.io/tokyo-griffin-401620/neuronpedia-autointerp:cpu
-# docker push gcr.io/tokyo-griffin-401620/neuronpedia-autointerp:gpu
-
-# Run the container
-# replace SECRET and SENTRY_DSN with your own values
-# CPU
-# docker run -p 5003:5003 -e SECRET=[SECRET] -e SENTRY_DSN=[SENTRY_DSN] neuronpedia-autointerp:cpu poetry run autointerp --model_id "gpt2-small" --host "0.0.0.0" --port 5002 --max_loaded_saes 200 --sae_sets res-jb
-# GPU
-# docker run --gpus all -p 5003:5003 -e SECRET=[SECRET] -e SENTRY_DSN=[SENTRY_DSN] neuronpedia-autointerp:gpu poetry run autointerp --model_id "gpt2-small" --host "0.0.0.0" --port 5002 --max_loaded_saes 200 --sae_sets res-jb
-
 ARG BUILD_TYPE
 ARG CUDA_VERSION=12.1.0
 ARG UBUNTU_VERSION=22.04

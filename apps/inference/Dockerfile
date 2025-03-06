@@ -1,15 +1,3 @@
-# Build the image - from root directory
-# CPU
-# docker build --platform=linux/amd64 -t neuronpedia-inference:cpu -f apps/inference/Dockerfile --build-arg BUILD_TYPE=nocuda .
-# GPU
-# docker build --platform=linux/amd64 -t neuronpedia-inference:gpu -f apps/inference/Dockerfile --build-arg BUILD_TYPE=cuda .
-
-# Push the image to the registry
-# docker tag neuronpedia-inference:cpu gcr.io/tokyo-griffin-401620/neuronpedia-inference:cpu
-# docker tag neuronpedia-inference:gpu gcr.io/tokyo-griffin-401620/neuronpedia-inference:gpu
-# docker push gcr.io/tokyo-griffin-401620/neuronpedia-inference:cpu
-# docker push gcr.io/tokyo-griffin-401620/neuronpedia-inference:gpu
-
 ARG BUILD_TYPE
 ARG CUDA_VERSION=12.1.0
 ARG UBUNTU_VERSION=22.04
