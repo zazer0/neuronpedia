@@ -74,10 +74,10 @@ if you are making changes to the openapi spec (new/updated endpoints) and want t
 
 ```
 # switch to local inference client
-`poetry remove neuronpedia-inference-client && poetry add ../../packages/python-inference-client/`
+poetry remove neuronpedia-inference-client && poetry add ../../packages/python-inference-client/
 
-# switch to pypi inference client
-`poetry remove neuronpedia-inference-client && poetry add neuronpedia-inference-client`
+# switch back to pypi/production inference client
+poetry remove neuronpedia-inference-client && poetry add neuronpedia-inference-client`
 ```
 
 ## setup + run - docker
@@ -88,35 +88,47 @@ if you are making changes to the openapi spec (new/updated endpoints) and want t
    2. GPU: `docker build --platform=linux/amd64 -t neuronpedia-inference:gpu -f apps/inference/Dockerfile --build-arg BUILD_TYPE=cuda .`
 3. run
    1. CPU
-   ```
-   docker run \
-    -p 5002:5002 \
-    -e SECRET=secret \
-    -e MODEL_ID=gpt2-small \
-    -e SAE_SETS='["res-jb"]' \
-    neuronpedia-inference:cpu
-   ```
-   2. GPU
-   ```
-   docker run \
-    --gpus all \
-    -p 5002:5002 \
-    -e SECRET=secret \
-    -e MODEL_ID=gpt2-small \
-    -e SAE_SETS='["res-jb"]' \
-    neuronpedia-inference:gpu
-   ```
+
+```
+
+docker run \
+ -p 5002:5002 \
+ -e SECRET=secret \
+ -e MODEL_ID=gpt2-small \
+ -e SAE_SETS='["res-jb"]' \
+ neuronpedia-inference:cpu
+
+```
+
+2. GPU
+
+```
+
+docker run \
+ --gpus all \
+ -p 5002:5002 \
+ -e SECRET=secret \
+ -e MODEL_ID=gpt2-small \
+ -e SAE_SETS='["res-jb"]' \
+ neuronpedia-inference:gpu
+
+```
+
 4. tag and push to a repo (google cloud example)
 
-   ```
-   # tag + push cpu
-   docker tag neuronpedia-inference:cpu gcr.io/$(gcloud config get-value project)/neuronpedia-inference:cpu
+```
+
+# tag + push cpu
+
+docker tag neuronpedia-inference:cpu gcr.io/$(gcloud config get-value project)/neuronpedia-inference:cpu
    docker push gcr.io/$(gcloud config get-value project)/neuronpedia-inference:cpu
 
-   # tag + push gpu
-   docker tag neuronpedia-inference:gpu gcr.io/$(gcloud config get-value project)/neuronpedia-inference:gpu
+# tag + push gpu
+
+docker tag neuronpedia-inference:gpu gcr.io/$(gcloud config get-value project)/neuronpedia-inference:gpu
    docker push gcr.io/$(gcloud config get-value project)/neuronpedia-inference:gpu
-   ```
+
+```
 
 ## setup + run - kubernetes
 
@@ -130,13 +142,13 @@ all endpoints are documented under `schemas/openapi/inference-server.yaml`. some
 
 ```bash
 curl -X POST http://127.0.0.1:5002/v1/activation/single \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "this is about dogs!",
-    "model": "gemma-2-2b",
-    "source": "20-gemmascope-res-16k",
-    "index": 12082
-  }'
+-H "Content-Type: application/json" \
+-d '{
+ "prompt": "this is about dogs!",
+ "model": "gemma-2-2b",
+ "source": "20-gemmascope-res-16k",
+ "index": 12082
+}'
 ```
 
 you'll get the following response
