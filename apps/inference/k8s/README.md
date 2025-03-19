@@ -126,7 +126,7 @@ kubectl rollout restart deployment gpt2-small-public-cpu-neuronpedia-inference &
 kubectl rollout restart deployment gemma-2-2b-it-a-gpu-neuronpedia-inference && \
 kubectl rollout restart deployment gemma-2-2b-it-b-gpu-neuronpedia-inference && \
 kubectl rollout restart deployment gemma-2-2b-public-gpu-lite-neuronpedia-inference && \
-kubectl rollout restart deployment gemma-2-2b-it-public-gpu-neuronpedia-inference && \
+kubectl rollout restart deployment gemma-2-2b-it-public-gpu-lite-neuronpedia-inference && \
 kubectl rollout restart deployment gemma-2-9b-it-a-gpu-neuronpedia-inference && \
 kubectl rollout restart deployment gemma-2-9b-it-b-gpu-neuronpedia-inference && \
 kubectl rollout restart deployment gemma-2-2b-gpu-neuronpedia-inference && \
