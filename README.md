@@ -13,6 +13,7 @@ this is the monorepo for [neuronpedia.org](neuronpedia.org), the open source int
   - ['i want to do high volume autointerp explanations'](#i-want-to-do-high-volume-autointerp-explanations)
   - ['i want to generate my own dashboards'](#i-want-to-generate-my-own-dashboards)
   - ['i want to add my dashboards/data to neuronpedia\`](#i-want-to-add-my-dashboardsdata-to-neuronpedia)
+- [feature overview](#feature-overview)
 - [architecture](#architecture)
   - [requirements](#requirements)
   - [services](#services)
@@ -261,6 +262,10 @@ TODO - use `utils/neuronpedia_utils/generate-dashboards-as-[saelens/vectors].py`
 ## 'i want to add my dashboards/data to neuronpedia`
 
 TODO - use [utils/neuronpedia_utils/export-data.py](utils/neuronpedia_utils/export-data.py) once you've added your data to your local database.
+
+# feature overview
+here's a diagram showing the main features of neuronpedia as of march 2025.
+![neuronpedia-features](https://github.com/user-attachments/assets/13e07a93-e046-4e1c-b670-2d26d251d55d)
 
 # architecture
 
