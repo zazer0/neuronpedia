@@ -1,14 +1,16 @@
-from pathlib import Path
-from huggingface_hub import snapshot_download
-from neuronpedia_inference.saes.saelens import SaeLensSAE
-from neuronpedia_inference.config import (
-    get_saelens_neuronpedia_directory_df,
-    get_sae_lens_ids_from_neuronpedia_id,
-)
 import logging
-from collections import OrderedDict
 import time
-from neuronpedia_inference.config import Config
+from collections import OrderedDict
+from pathlib import Path
+
+from huggingface_hub import snapshot_download
+
+from neuronpedia_inference.config import (
+    Config,
+    get_sae_lens_ids_from_neuronpedia_id,
+    get_saelens_neuronpedia_directory_df,
+)
+from neuronpedia_inference.saes.saelens import SaeLensSAE
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +28,7 @@ class SAE_TYPE:
 def get_layer_num_from_sae_id(sae_id: str) -> int:
     if sae_id.isdigit():
         return int(sae_id)
-    else:
-        return int(sae_id.split("-")[0])
+    return int(sae_id.split("-")[0])
 
 
 class SAEManager:

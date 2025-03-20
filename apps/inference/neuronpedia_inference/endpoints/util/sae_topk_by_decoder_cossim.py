@@ -1,22 +1,23 @@
 import logging
-from fastapi.responses import JSONResponse
-from neuronpedia_inference.sae_manager import SAE_TYPE
+
 import torch
-from neuronpedia_inference_client.models.util_sae_topk_by_decoder_cossim_post_request import (
-    UtilSaeTopkByDecoderCossimPostRequest,
-)
+from fastapi import APIRouter
+from fastapi.responses import JSONResponse
+from neuronpedia_inference_client.models.np_feature import NPFeature
 from neuronpedia_inference_client.models.util_sae_topk_by_decoder_cossim_post200_response import (
     UtilSaeTopkByDecoderCossimPost200Response,
 )
 from neuronpedia_inference_client.models.util_sae_topk_by_decoder_cossim_post200_response_topk_decoder_cossim_features_inner import (
     UtilSaeTopkByDecoderCossimPost200ResponseTopkDecoderCossimFeaturesInner,
 )
-from neuronpedia_inference_client.models.np_feature import NPFeature
+from neuronpedia_inference_client.models.util_sae_topk_by_decoder_cossim_post_request import (
+    UtilSaeTopkByDecoderCossimPostRequest,
+)
+
+from neuronpedia_inference.sae_manager import SAE_TYPE, SAEManager
 from neuronpedia_inference.shared import (
     with_request_lock,
 )
-from neuronpedia_inference.sae_manager import SAEManager
-from fastapi import APIRouter
 
 logger = logging.getLogger(__name__)
 
