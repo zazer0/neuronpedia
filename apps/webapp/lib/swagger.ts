@@ -5,7 +5,7 @@ This is Neuronpedia's API. You can test calls right in the browser.
 
 Get your API key by logging in at [neuronpedia.org](https://www.neuronpedia.org) then going to [/account](https://neuronpedia.org/account).
 
-Requests for new APIs, questions, or feedback? Contact [johnny@neuronpedia.org](mailto:johnny@neuronpedia.org).
+Requests for new APIs, questions, or feedback? [Contact us](https://neuronpedia.org/contact).
 `;
 
 export const getApiDocs = async () => {
