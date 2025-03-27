@@ -8,11 +8,11 @@ import Link from 'next/link';
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: `The Residual Stream - Neuronpedia's Blog`,
-    description: "The Residual Stream is Neuronpedia's official blog.",
+    title: `The Residual Stream - Neuronpedia's Official Blog`,
+    description: 'The Residual Stream is Neuronpedia&apos;s official blog.',
     openGraph: {
-      title: `The Residual Stream - Neuronpedia's Blog`,
-      description: "The Residual Stream is Neuronpedia's official blog.",
+      title: `The Residual Stream - Neuronpedia's Official Blog`,
+      description: 'The Residual Stream is Neuronpedia&apos;s official blog.',
       url: `/blog`,
       images: [
         {
