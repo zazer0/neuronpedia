@@ -26,6 +26,7 @@
 </p>
 
 - [about neuronpedia](#about-neuronpedia)
+- [instant start - vercel deploy](#instant-start---vercel-deploy)
 - [quick start - local webapp + demo environment](#quick-start---local-webapp--demo-environment)
 - [setting up your local environment](#setting-up-your-local-environment)
   - ["i want to use a local database / import more neuronpedia data"](#i-want-to-use-a-local-database--import-more-neuronpedia-data)
@@ -70,6 +71,16 @@ a diagram showing the main features of neuronpedia as of march 2025.
     <img src="https://github.com/user-attachments/assets/f8fe432f-fc6c-484f-a262-c79c4ac524af" alt="demo of inference search" width="32%"/>
     &nbsp;
     <img src="https://github.com/user-attachments/assets/4a6c9cbc-fd40-4fd7-b05a-67f2eff128fd" alt="demo of umap" width="32%"/>
+</p>
+
+# instant start - vercel deploy
+
+click the `Deploy` button to instantly deploy a custom neuronpedia. a [free vercel account](https://vercel.com/signup) is required.
+
+<p align="left">
+  <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fhijohnnylin%2Fneuronpedia&env=NEXT_PUBLIC_SITE_NAME_VERCEL_DEPLOY&envDescription=***Your%20Custom%20Website%20Name.%20For%20example%3A%20PuppyNeurons***&root-directory=apps/webapp&build-command=npx%20prisma%20generate%20%26%26%20npm%20run%20build%3Ademo&project-name=my-neuronpedia&repository-name=my-neuronpedia&demo-title=Neuronpedia&demo-description=Deploy%20your%20own%20custom%20Neuronpedia%20%F0%9F%9A%80%F0%9F%A7%A0%F0%9F%A7%90&demo-url=https%3A%2F%2Fneuronpedia.org">
+    <img src="https://vercel.com/button" width="160" alt="Deploy with Vercel"/>
+  </a>
 </p>
 
 # quick start - local webapp + demo environment
