@@ -56,7 +56,7 @@ TODO, after making repo public -->
 
 # about neuronpedia
 
-check out our [blog post](https://www.neuronpedia.org/blog/neuronpedia-is-now-open-source) about Neuronpedia, why we're open sourcing it, and other details.
+check out our [blog post](https://www.neuronpedia.org/blog/neuronpedia-is-now-open-source) about Neuronpedia, why we're open sourcing it, and other details. there's also a [tweet thread](https://x.com/neuronpedia/status/1906793456879775745) with quick demos.
 
 **feature overview**
 
