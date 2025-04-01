@@ -185,37 +185,35 @@ def config_to_json(
     selected_sets_neuronpedia: list[str] | None = None,
     selected_model: str | None = None,
 ) -> list[dict[str, Any]]:
-    filtered_df = directory_df.copy()
     if selected_model:
-        filtered_df = filtered_df[filtered_df["model"] == selected_model]
+        directory_df = directory_df.loc[directory_df["model"] == selected_model]
     if selected_sets_neuronpedia and selected_sets_sae_lens:
-        filtered_df = filtered_df[
-            (filtered_df["neuronpedia_set"].isin(selected_sets_neuronpedia))  # type: ignore
-            | (filtered_df["release"].isin(selected_sets_sae_lens))  # type: ignore
+        directory_df = directory_df.loc[
+            (directory_df["neuronpedia_set"].isin(selected_sets_neuronpedia))
+            | (directory_df["release"].isin(selected_sets_sae_lens))
         ]
     elif selected_sets_sae_lens:
-        filtered_df = filtered_df[
-            filtered_df["release"].isin(selected_sets_sae_lens)  # type: ignore
+        directory_df = directory_df.loc[
+            directory_df["release"].isin(selected_sets_sae_lens)
         ]
     elif selected_sets_neuronpedia:
-        filtered_df = filtered_df[
-            (filtered_df["neuronpedia_set"].isin(selected_sets_neuronpedia))  # type: ignore
+        directory_df = directory_df.loc[
+            directory_df["neuronpedia_set"].isin(selected_sets_neuronpedia)
         ]
     grouped = directory_df.groupby("model")
-    sets_to_include = directory_df.neuronpedia_set.unique()
     config_json = []
     for model, group in grouped:
-        sets_to_include = directory_df.neuronpedia_set.unique()
+        # Get unique sets within the group (you can also use directory_df if that's intended)
+        sets_to_include = group["neuronpedia_set"].unique()
         for set_name in sets_to_include:
-            set_data = group[group["neuronpedia_set"] == set_name]
+            set_data = group.loc[group["neuronpedia_set"] == set_name]
             set_entry = {
                 "model": model,
                 "set": set_name,
                 "type": "saelens-1",
                 "local": False,
                 "saes": [
-                    sae.split("/")[-1]
-                    for sae in set_data["neuronpedia_id"].values  # type: ignore
+                    sae.split("/")[-1] for sae in set_data["neuronpedia_id"].tolist()
                 ],
             }
             config_json.append(set_entry)
