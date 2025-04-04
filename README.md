@@ -34,8 +34,7 @@
   - ["i want to run/develop inference locally"](#i-want-to-rundevelop-inference-locally)
   - ['i want to run/develop autointerp locally\`](#i-want-to-rundevelop-autointerp-locally)
   - ['i want to do high volume autointerp explanations'](#i-want-to-do-high-volume-autointerp-explanations)
-  - ['i want to generate my own dashboards'](#i-want-to-generate-my-own-dashboards)
-  - ['i want to add my dashboards/data to neuronpedia\`](#i-want-to-add-my-dashboardsdata-to-neuronpedia)
+  - ['i want to generate my own dashboards/data and add it to neuronpedia'](#i-want-to-generate-my-own-dashboardsdata-and-add-it-to-neuronpedia)
 - [architecture](#architecture)
   - [requirements](#requirements)
   - [services](#services)
@@ -319,17 +318,92 @@ this section is under construction.
 - use EleutherAI's [Delphi library](https://github.com/EleutherAI/delphi)
 - for OpenAI's autointerp, use [utils/neuronpedia_utils/batch-autointerp.py](utils/neuronpedia_utils/batch-autointerp.py)
 
-## 'i want to generate my own dashboards'
+## 'i want to generate my own dashboards/data and add it to neuronpedia'
 
 this section is under construction.
 
-TODO - use `utils/neuronpedia_utils/generate-dashboards-as-[saelens/vectors].py`, or use the [saedashboard example](https://github.com/jbloomAus/SAEDashboard/blob/main/sae_dashboard/neuronpedia/generating_neuronpedia_outputs.ipynb) and then convert it using [this script](`utils/neuronpedia_utils/convert-saedashboard-to-neuronpedia-export.py).
+[TODO: simplify generation + upload of data to neuronpedia](https://github.com/hijohnnylin/neuronpedia/issues/46)
 
-## 'i want to add my dashboards/data to neuronpedia`
+[TODO: neuronpedia-utils should use poetry](https://github.com/hijohnnylin/neuronpedia/issues/43)
 
-this section is under construction.
+in this example, we will generate dashboards/data for an [SAELens](https://github.com/jbloomAus/SAELens)-compatible SAE, and upload it to our own Neuronpedia instance.
 
-TODO - use [utils/neuronpedia_utils/export-data.py](utils/neuronpedia_utils/export-data.py) once you've added your data to your local database.
+1. ensure you have [Poetry installed](https://python-poetry.org/docs/)
+2. [upload](https://github.com/jbloomAus/SAELens/blob/main/tutorials/uploading_saes_to_huggingface.ipynb) your SAELens-compatible source/SAE to HuggingFace.
+   > Example
+   > ➡️ [https://huggingface.co/chanind/gemma-2-2b-batch-topk-matryoshka-saes-w-32k-l0-40](https://huggingface.co/chanind/gemma-2-2b-batch-topk-matryoshka-saes-w-32k-l0-40)
+3. clone SAELens locally.
+   ```
+   git clone https://github.com/jbloomAus/SAELens.git
+   ```
+4. open your cloned SAELens and edit the file `sae_lens/pretrained_saes.yaml`. add a new entry at the bottom, based on the template below (see comments for how to fill it out):
+   > Example
+   > ➡️ [https://github.com/jbloomAus/SAELens/pull/455/files](https://github.com/jbloomAus/SAELens/pull/455/files)
+   ```
+   gemma-2-2b-res-matryoshka-dc:                 # a unique ID for your set of SAEs
+     conversion_func: null                       # null if your SAE config is already compatible with SAELens
+     links:                                      # optional links
+       model: https://huggingface.co/google/gemma-2-2b
+     model: gemma-2-2b                           # transformerlens model id - https://transformerlensorg.github.io/TransformerLens/generated/model_properties_table.html
+     repo_id: chanind/gemma-2-2b-batch-topk-matryoshka-saes-w-32k-l0-40  # the huggingface repo path
+     saes:
+     - id: blocks.0.hook_resid_post                 # an id for this SAE
+       path: standard/blocks.0.hook_resid_post      # the path in the repo_id to the SAE
+       l0: 40.0
+       neuronpedia: gemma-2-2b/0-matryoshka-res-dc  # what you expect the neuronpedia URI to be - neuronpedia.org/[this_slug]. should be [model_id]/[layer]-[identical_slug_for_this_sae_set]
+     - id: blocks.1.hook_resid_post                 # more SAEs in this SAE set
+       path: standard/blocks.1.hook_resid_post
+       l0: 40.0
+       neuronpedia: gemma-2-2b/1-matryoshka-res-dc  # note that this is identical to the entry above, except 1 instead of 0 for the layer
+     - [...]
+   ```
+5. clone [SAEDashboard](https://github.com/jbloomAus/SAEDashboard.git) locally.
+   ```
+   git clone https://github.com/jbloomAus/SAEDashboard.git
+   ```
+6. configure your cloned `SAEDashboard` to use your cloned modified `SAELens`, instead of the one in production
+   ```
+   cd SAEDashboard                    # set directory
+   poetry lock && poetry install      # install dependencies
+   poetry remove sae-lens             # remove production dependency
+   poetry add PATH/TO/CLONED/SAELENS  # set local dependency
+   ```
+7. generate dashboards for the SAE. this will take from 30 min to a few hours, depending on your hardware and size of model.
+
+   ```
+   cd SAEDashboard                    # set directory
+   rm -rf cached_activations          # clear old cached data
+
+   # start the generation. details for each argument (full details: https://github.com/jbloomAus/SAEDashboard/blob/main/sae_dashboard/neuronpedia/neuronpedia_runner_config.py)
+   #     - sae-set = should match the unique ID for the set from pretrained_saes.yaml
+   #     - sae-path = should match the id for the sae in from pretrained_saes.yaml
+   #     - np-set-name = should match the [identical_slug_for_this_sae_set] for the sae.neuronpedia from pretrained_saes.yaml
+   #     - dataset-path = the huggingface dataset to use for generating activations. usually you want to use the same dataset the model was trained on.
+   #     - output-dir = the output directory of the dashboard data
+   #     - n-prompts = number of activation texts to test from the dataset
+   #     - n-tokens-in-prompt, n-features-per-batch, n-prompts-in-forward-pass = keep these at 128
+   poetry run neuronpedia-runner \
+        --sae-set="gemma-2-2b-res-matryoshka-dc" \
+        --sae-path="blocks.12.hook_resid_post" \
+        --np-set-name="matryoshka-res-dc" \
+        --dataset-path="monology/pile-uncopyrighted" \
+        --output-dir="neuronpedia_outputs/" \
+        --sae_dtype="float32" \
+        --model_dtype="bfloat16" \
+        --sparsity-threshold=1 \
+        --n-prompts=24576 \
+        --n-tokens-in-prompt=128 \
+        --n-features-per-batch=128 \
+        --n-prompts-in-forward-pass=128
+   ```
+
+8. convert these dashboards for import into neuronpedia
+   ```
+   cd neuronpedia/utils/neuronpedia-utils          # get into this current repository's util directory
+   python convert-saedashboard-to-neuronpedia.py   # start guided conversion script. follow the steps.
+   ```
+9. once dashboard files are generated for neuronpedia, upload these to the global Neuronpedia S3 bucket - currently you need to [contact us](mailto:johnny@neuronpedia.org) to do this.
+10. from a localhost instance, [import your data](#i-want-to-use-a-local-database--import-more-neuronpedia-data)
 
 # architecture
 
