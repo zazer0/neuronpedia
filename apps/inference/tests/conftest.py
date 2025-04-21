@@ -10,7 +10,6 @@ from neuronpedia_inference.sae_manager import SAEManager
 from neuronpedia_inference.shared import Model
 from neuronpedia_inference.server import initialize
 from neuronpedia_inference.args import parse_env_and_args
-from unittest.mock import patch
 
 @pytest.fixture(scope="session")
 def initialize_models():
