@@ -1,6 +1,8 @@
 import torch
-from neuronpedia_inference.shared import Model
+
 from neuronpedia_inference.sae_manager import SAEManager
+from neuronpedia_inference.shared import Model
+
 
 def test_initialize(initialize_models): # noqa: ARG001
     """

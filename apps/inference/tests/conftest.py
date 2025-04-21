@@ -1,15 +1,18 @@
 import asyncio
-import pytest
-import os
-import torch
 import gc
 import json
+import os
+
+import pytest
+import torch
+
 import neuronpedia_inference.server as server
+from neuronpedia_inference.args import parse_env_and_args
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.sae_manager import SAEManager
-from neuronpedia_inference.shared import Model
 from neuronpedia_inference.server import initialize
-from neuronpedia_inference.args import parse_env_and_args
+from neuronpedia_inference.shared import Model
+
 
 @pytest.fixture(scope="session")
 def initialize_models():
