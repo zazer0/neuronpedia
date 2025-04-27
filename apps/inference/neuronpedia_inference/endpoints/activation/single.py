@@ -3,7 +3,7 @@ from typing import Any
 
 import einops
 import torch
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from neuronpedia_inference_client.models.activation_single_post200_response import (
     ActivationSinglePost200Response,
@@ -193,9 +193,17 @@ def process_feature_activations(
     hook_name: str,
     index: int,
 ) -> ActivationSinglePost200ResponseActivation:
-    if sae_type == "saelens-1":
-        return process_saelens_activations(sae, cache, hook_name, index)
-    raise ValueError(f"Unsupported SAE type: {sae_type}")
+    supported_types = ["saelens-1"]
+    if sae_type not in supported_types:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": f"Unsupported SAE type: {sae_type}",
+                "message": f"SAE type '{sae_type}' is not supported. Supported types: {supported_types}",
+                "supported_types": supported_types
+            }
+        )
+    return process_saelens_activations(sae, cache, hook_name, index)
 
 
 def process_saelens_activations(

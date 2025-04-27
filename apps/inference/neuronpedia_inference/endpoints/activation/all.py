@@ -54,18 +54,28 @@ async def activation_all(
     if len(request.selected_sources) == 0:
         request.selected_sources = sae_manager.sae_set_to_saes[request.source_set]
 
-    # Check if the number of requested layers exceeds the maximum
     if len(request.selected_sources) > config.MAX_LOADED_SAES:
-        logger.error(
-            "Number of requested layers (%s) exceeds the maximum allowed (%s)",
-            len(request.selected_sources),
-            config.MAX_LOADED_SAES,
-        )
         return JSONResponse(
             content={
-                "error": f"Number of requested SAEs ({len(request.selected_sources)}) exceeds the maximum allowed ({config.MAX_LOADED_SAES})"
+                "error": "Too many SAEs requested",
+                "message": f"Number of requested SAEs ({len(request.selected_sources)}) exceeds the maximum allowed ({config.MAX_LOADED_SAES})",
+                "max_allowed": config.MAX_LOADED_SAES,
+                "requested": len(request.selected_sources)
             },
-            status_code=400,
+            status_code=400
+        )
+
+    # Validate all SAEs exist
+    invalid_sources = [s for s in request.selected_sources if not sae_manager.has_sae(s)]
+    if invalid_sources:
+        return JSONResponse(
+            content={
+                "error": "Invalid SAE sources",
+                "message": f"The following SAE sources are not available: {invalid_sources}",
+                "invalid_sources": invalid_sources,
+                "available_sources": sae_manager.list_available_saes()
+            },
+            status_code=400
         )
 
     # get feature filter

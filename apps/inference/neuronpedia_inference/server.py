@@ -244,21 +244,21 @@ async def check_model(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
     config = Config.get_instance()
-
+    
     if request.method == "POST":
         try:
             body = await request.json()
-            if "model" in body and (
-                body["model"] != config.MODEL_ID
-                and body["model"] != config.OVERRIDE_MODEL_ID
-            ):
-                logger.error("Unsupported model: %s", body["model"])
+            if "model" in body and (body["model"] != config.MODEL_ID and body["model"] != config.OVERRIDE_MODEL_ID):
                 return JSONResponse(
-                    content={"error": "Unsupported model"}, status_code=400
+                    content={
+                        "error": "Unsupported model",
+                        "message": f"Model '{body['model']}' is not supported. Supported models: {config.MODEL_ID}, {config.OVERRIDE_MODEL_ID}",
+                        "supported_models": [config.MODEL_ID, config.OVERRIDE_MODEL_ID]
+                    }, 
+                    status_code=400
                 )
         except (json.JSONDecodeError, ValueError):
             pass
-
     return await call_next(request)
 
 
