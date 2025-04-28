@@ -5,12 +5,13 @@ import os
 
 import pytest
 import torch
+from fastapi.testclient import TestClient
 
 import neuronpedia_inference.server as server
 from neuronpedia_inference.args import parse_env_and_args
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.sae_manager import SAEManager
-from neuronpedia_inference.server import initialize
+from neuronpedia_inference.server import app, initialize
 from neuronpedia_inference.shared import Model
 
 
@@ -56,3 +57,8 @@ def initialize_models():
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
     gc.collect()
+
+
+@pytest.fixture(scope="session")
+def client(initialize_models):  # noqa: ARG001
+    return TestClient(app)
