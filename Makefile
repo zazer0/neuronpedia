@@ -117,7 +117,9 @@ webapp-localhost-test: ## Webapp: Localhost Environment - Run (Playwright)
 inference-localhost-install: ## Inference: Localhost Environment - Install Dependencies (Development Build)
 	@echo "Installing the inference dependencies for development in the localhost environment..."
 	cd apps/inference && \
-	poetry install
+	poetry remove neuronpedia-inference-client || true && \
+	poetry add ../../packages/python/neuronpedia-inference-client && \
+	poetry lock && poetry install
 
 inference-localhost-build: ## Inference: Localhost Environment - Build
 	@echo "Building the inference server for the localhost environment..."
