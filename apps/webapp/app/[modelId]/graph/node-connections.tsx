@@ -92,7 +92,14 @@ function FeatureList({
 }
 
 export default function GraphNodeConnections() {
-  const { visState, selectedGraph, updateVisStateField, isEditingLabel, getOverrideClerpForNode } = useGraphContext();
+  const {
+    visState,
+    selectedGraph,
+    updateVisStateField,
+    isEditingLabel,
+    getOverrideClerpForNode,
+    setFullNPFeatureDetail,
+  } = useGraphContext();
 
   const [clickedNode, setClickedNode] = useState<CLTGraphNode | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -108,6 +115,12 @@ export default function GraphNodeConnections() {
       setClickedNode(null);
     }
   }, [visState.clickedId, selectedGraph]);
+
+  useEffect(() => {
+    if (clickedNode) {
+      setFullNPFeatureDetail(setClickedNode, clickedNode);
+    }
+  }, [clickedNode]);
 
   return (
     <div

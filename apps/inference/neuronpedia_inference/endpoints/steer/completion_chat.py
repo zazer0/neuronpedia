@@ -28,17 +28,14 @@ from neuronpedia_inference.inference_utils.steering import (
     stream_lock,
 )
 from neuronpedia_inference.sae_manager import SAEManager
-from neuronpedia_inference.shared import (
-    Model,
-    with_request_lock,
-)
+from neuronpedia_inference.shared import Model, with_request_lock
 
 logger = logging.getLogger(__name__)
 
 
 router = APIRouter()
 
-TOKENS_PER_YIELD = 2
+TOKENS_PER_YIELD = 1
 
 
 @router.post("/steer/completion-chat")
