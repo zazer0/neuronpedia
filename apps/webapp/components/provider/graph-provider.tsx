@@ -9,6 +9,7 @@ import {
   FilterGraphType,
   MODEL_DIGITS_IN_FEATURE_ID,
   MODEL_HAS_NEURONPEDIA_DASHBOARDS,
+  MODEL_HAS_S3_DASHBOARDS,
   ModelToGraphMetadatasMap,
   convertAnthropicFeatureIdToNeuronpediaSourceSet,
   formatCLTGraphData,
@@ -17,11 +18,26 @@ import {
   modelIdToModelDisplayName,
   nodeTypeHasFeatureDetail,
 } from '@/app/[modelId]/graph/utils';
-import { GraphMetadataWithPartialRelations, NeuronWithPartialRelations } from '@/prisma/generated/zod';
+import {
+  ActivationWithPartialRelations,
+  GraphMetadataWithPartialRelations,
+  NeuronWithPartialRelations,
+} from '@/prisma/generated/zod';
 import { GraphMetadata } from '@prisma/client';
 import { useSession } from 'next-auth/react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Dispatch,
+  ReactNode,
+  SetStateAction,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 const ANTHROPIC_FEATURE_DETAIL_DOWNLOAD_BATCH_SIZE = 32;
 const NEURONPEDIA_FEATURE_DETAIL_DOWNLOAD_BATCH_SIZE = 1024;
@@ -77,6 +93,9 @@ type GraphContextType = {
   // Loading graph label
   loadingGraphLabel: string;
   setLoadingGraphLabel: (label: string) => void;
+
+  // setFullNPFeatureDetail
+  setFullNPFeatureDetail: (setNode: Dispatch<SetStateAction<CLTGraphNode | null>>, node: CLTGraphNode) => void;
 };
 
 // Create the context with a default value
@@ -420,6 +439,20 @@ export function GraphProvider({
           maxActsToReturn: GRAPH_PREFETCH_ACTIVATIONS_COUNT,
         }));
 
+      // console.log(`features before dedup:${features.length}`);
+      // // deduplicate the features
+      // const uniqueFeatures = new Map<string, any>();
+      // features.forEach((feature) => {
+      //   const key = `${feature.modelId}-${feature.layer}-${feature.index}`;
+      //   if (!uniqueFeatures.has(key)) {
+      //     uniqueFeatures.set(key, feature);
+      //   }
+      // });
+
+      // console.log(`features after dedup: ${features.length}`);
+      // Convert the Map values back to an array
+      // features = Array.from(uniqueFeatures.values());
+
       console.log('number of features:', features.length);
       // split the features into batches of NEURONPEDIA_FEATURE_DETAIL_DOWNLOAD_BATCH_SIZE
       const batches = [];
@@ -467,7 +500,7 @@ export function GraphProvider({
           d.featureDetailNP = feature as NeuronWithPartialRelations;
         }
       });
-    } else {
+    } else if (MODEL_HAS_S3_DASHBOARDS.has(selectedModelId)) {
       // otherwise get the feature from the bucket
       const featureDetails = await fetchInBatches(
         formattedData.nodes,
@@ -485,6 +518,7 @@ export function GraphProvider({
         d.featureDetail = featureDetails[i] as AnthropicFeatureDetail;
       });
     }
+    // neither neuronpedia nor s3 dashboards
 
     setIsLoadingGraphData(false);
     return formattedData;
@@ -505,6 +539,54 @@ export function GraphProvider({
       setSelectedGraph(null);
     }
   }, [selectedMetadataGraph]);
+
+  const setFullNPFeatureDetail = (setNode: Dispatch<SetStateAction<CLTGraphNode | null>>, node: CLTGraphNode) => {
+    // load the rest of the activations on demand
+    if (
+      node?.featureDetailNP &&
+      node?.featureDetailNP.activations &&
+      node?.featureDetailNP.activations.length <= GRAPH_PREFETCH_ACTIVATIONS_COUNT
+    ) {
+      fetch(`/api/activation/get`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modelId: node.featureDetailNP.modelId,
+          source: node.featureDetailNP.layer,
+          index: node.featureDetailNP.index,
+        }),
+      })
+        .then((response) => response.json())
+        .then((acts: ActivationWithPartialRelations[]) => {
+          if (node?.featureDetailNP) {
+            // console.log('setting full NP feature detail', acts.length);
+            // Create a new node object with updated activations to trigger re-render
+            setNode((prevNode: CLTGraphNode | null) => {
+              if (!prevNode || !prevNode.featureDetailNP) return prevNode;
+              // don't change node object if it's a different node now
+              if (prevNode.nodeId !== node?.nodeId) return prevNode;
+              return {
+                ...prevNode,
+                featureDetailNP: {
+                  ...prevNode.featureDetailNP,
+                  activations: acts,
+                },
+              };
+            });
+            // add it to the selectedGraph
+            if (selectedGraph) {
+              const matchingNode = selectedGraph.nodes.find((n) => n.nodeId === node.nodeId);
+              if (matchingNode && matchingNode.featureDetailNP) {
+                matchingNode.featureDetailNP.activations = acts;
+              }
+            }
+          }
+        })
+        .catch((error) => {
+          console.error(`error submitting getting rest of feature: ${error}`);
+        });
+    }
+  };
 
   // Provide the context value
   const contextValue = useMemo(
@@ -537,6 +619,7 @@ export function GraphProvider({
       shouldShowGraphToCurrentUser,
       loadingGraphLabel,
       setLoadingGraphLabel,
+      setFullNPFeatureDetail,
     }),
     [
       modelIdToMetadataMap,
@@ -559,6 +642,7 @@ export function GraphProvider({
       shouldShowGraphToCurrentUser,
       loadingGraphLabel,
       setLoadingGraphLabel,
+      setFullNPFeatureDetail,
     ],
   );
 

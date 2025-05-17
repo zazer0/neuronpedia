@@ -1047,11 +1047,9 @@ export default function Subgraph() {
     }
   }, [visState.pinnedIds]);
 
-  const SUBGRAPH_HEIGHT = 410;
-
   return (
-    <Card className="mt-2 w-full bg-white">
-      <CardContent className="px-2 py-2">
+    <Card className="h-full w-full flex-1 bg-white">
+      <CardContent className="h-full px-0 py-0">
         {/* <div className="mb-3 mt-2 flex w-full flex-row items-center justify-start gap-x-2">
         <div className="text-sm font-bold text-slate-600">Subgraph</div>
         <CustomTooltip wide trigger={<QuestionMarkCircledIcon className="h-4 w-4 text-slate-500" />}>
@@ -1065,14 +1063,12 @@ export default function Subgraph() {
           </div>
         </CustomTooltip>
       </div> */}
-        <div className="subgraph relative h-[410px] w-full">
-          <svg className={`absolute h-[${SUBGRAPH_HEIGHT}px] w-full`} height={SUBGRAPH_HEIGHT} ref={svgRef} />
-          <div className={`absolute h-[${SUBGRAPH_HEIGHT}px] w-full`} ref={divRef} />
+        <div className="subgraph relative h-full w-full">
+          <svg className="absolute h-full w-full" ref={svgRef} />
+          <div className="absolute h-full w-full" ref={divRef} />
 
           {(visState.pinnedIds.length === 0 || showSubgraphHelp) && (
-            <div
-              className={`absolute flex bg-white/80 h-[${SUBGRAPH_HEIGHT}px] min-h-[${SUBGRAPH_HEIGHT}px] w-full flex-col items-start justify-center gap-y-1.5 px-5 text-slate-700`}
-            >
+            <div className="absolute flex h-full min-h-full w-full flex-col items-start justify-center gap-y-1.5 rounded-xl bg-white/80 px-5 text-slate-700">
               <div className="mb-1.5 w-full text-center text-lg font-bold">Creating a Subgraph</div>
               <div>
                 <strong>· Pin or Unpin a Node</strong>
@@ -1097,7 +1093,7 @@ export default function Subgraph() {
           <Button
             variant="outline"
             size="sm"
-            className={`${visState.pinnedIds.length === 0 ? 'hidden' : 'absolute left-1.5 top-1 h-8 w-28 gap-x-1.5 rounded-full border-0 bg-slate-100 px-0 py-0 text-slate-600 hover:bg-slate-200'}`}
+            className={`${visState.pinnedIds.length === 0 ? 'hidden' : 'absolute left-3 top-3 h-8 w-28 gap-x-1.5 rounded-full border-0 bg-slate-100 px-0 py-0 text-slate-600 hover:bg-slate-200'}`}
             onClick={() => setShowSubgraphHelp(!showSubgraphHelp)}
           >
             {showSubgraphHelp ? (
@@ -1117,7 +1113,7 @@ export default function Subgraph() {
             size="sm"
             title="Reset Graph to Defaults"
             aria-label="Reset Graph to Defaults"
-            className={`${visState.pinnedIds.length === 0 ? 'hidden' : 'absolute'} right-0.5 top-0.5 h-8 w-8 flex-col items-center justify-center gap-y-1.5 whitespace-nowrap border-none border-slate-300 bg-slate-100 px-0 text-[8px] font-medium leading-none text-red-500 hover:bg-red-100 hover:text-red-600`}
+            className={`${visState.pinnedIds.length === 0 ? 'hidden' : 'absolute'} right-3 top-3 h-8 w-8 flex-col items-center justify-center gap-y-1.5 whitespace-nowrap border-none border-slate-300 bg-slate-100 px-0 text-[8px] font-medium leading-none text-red-500 hover:bg-red-100 hover:text-red-600`}
             onClick={() => {
               // eslint-disable-next-line
               if (confirm('Are you sure you want to reset the graph to its default state?')) {
