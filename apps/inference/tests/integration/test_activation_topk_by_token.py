@@ -9,10 +9,15 @@ from neuronpedia_inference_client.models.activation_topk_by_token_post_request i
 
 from tests.conftest import (
     BOS_TOKEN_STR,
+    MODEL_ID,
+    SAE_SELECTED_SOURCES,
     TEST_PROMPT,
-    TOPK_BY_TOKEN_ENDPOINT,
     X_SECRET_KEY,
 )
+
+# Test specific constants
+TOP_K = 3
+ENDPOINT = "/v1/activation/topk-by-token"
 
 
 def test_activation_topk_by_token_basic(client: TestClient):
@@ -21,14 +26,14 @@ def test_activation_topk_by_token_basic(client: TestClient):
     """
     request = ActivationTopkByTokenPostRequest(
         prompt=TEST_PROMPT,
-        model="gpt2-small",
-        source="7-res-jb",
-        top_k=3,
+        model=MODEL_ID,
+        source=SAE_SELECTED_SOURCES[0],
+        top_k=TOP_K,
         ignore_bos=True,
     )
 
     response = client.post(
-        TOPK_BY_TOKEN_ENDPOINT,
+        ENDPOINT,
         json=request.model_dump(),
         headers={"X-SECRET-KEY": X_SECRET_KEY},
     )
@@ -46,8 +51,8 @@ def test_activation_topk_by_token_basic(client: TestClient):
     # Check that each token has the requested number of top features
     for result in response_model.results:
         assert (
-            len(result.top_features) == 3
-        ), f"Expected 3 top features, got {len(result.top_features)}"
+            len(result.top_features) == TOP_K
+        ), f"Expected {TOP_K} top features, got {len(result.top_features)}"
         # Check that features are sorted by activation value
         activation_values = [
             feature.activation_value for feature in result.top_features
@@ -63,14 +68,14 @@ def test_activation_topk_by_token_with_bos(client: TestClient):
     """
     request = ActivationTopkByTokenPostRequest(
         prompt=TEST_PROMPT,
-        model="gpt2-small",
-        source="7-res-jb",
-        top_k=3,
+        model=MODEL_ID,
+        source=SAE_SELECTED_SOURCES[0],
+        top_k=TOP_K,
         ignore_bos=False,
     )
 
     response = client.post(
-        TOPK_BY_TOKEN_ENDPOINT,
+        ENDPOINT,
         json=request.model_dump(),
         headers={"X-SECRET-KEY": X_SECRET_KEY},
     )
@@ -92,15 +97,15 @@ def test_activation_topk_by_token_invalid_source(client: TestClient):
     """
     request = ActivationTopkByTokenPostRequest(
         prompt=TEST_PROMPT,
-        model="gpt2-small",
+        model=MODEL_ID,
         source="invalid-source",
-        top_k=3,
+        top_k=TOP_K,
         ignore_bos=True,
     )
 
     with pytest.raises(AssertionError) as excinfo:
         client.post(
-            TOPK_BY_TOKEN_ENDPOINT,
+            ENDPOINT,
             json=request.model_dump(),
             headers={"X-SECRET-KEY": X_SECRET_KEY},
         )
@@ -119,14 +124,14 @@ def test_activation_topk_by_token_long_prompt(client: TestClient):
 
     request = ActivationTopkByTokenPostRequest(
         prompt=long_prompt,
-        model="gpt2-small",
-        source="7-res-jb",
-        top_k=3,
+        model=MODEL_ID,
+        source=SAE_SELECTED_SOURCES[0],
+        top_k=TOP_K,
         ignore_bos=True,
     )
 
     response = client.post(
-        TOPK_BY_TOKEN_ENDPOINT,
+        ENDPOINT,
         json=request.model_dump(),
         headers={"X-SECRET-KEY": X_SECRET_KEY},
     )
