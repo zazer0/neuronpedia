@@ -86,9 +86,11 @@ def test_activation_topk_by_token_with_bos(client: TestClient):
 
     # Verify BOS token is included
     assert response_model.tokens[0] == BOS_TOKEN_STR, "BOS token not found at start"
-    assert len(response_model.results) == len(
-        response_model.tokens
-    ), "Results length doesn't match tokens length"
+
+    # Verify that each token has corresponding activation information
+    assert (
+        len(response_model.results) == len(response_model.tokens)
+    ), f"Number of activation results ({len(response_model.results)}) does not match number of tokens ({len(response_model.tokens)})"
 
 
 def test_activation_topk_by_token_invalid_source(client: TestClient):
