@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 from neuronpedia_inference_client.models.activation_topk_by_token_post200_response import (
     ActivationTopkByTokenPost200Response,
@@ -5,9 +6,13 @@ from neuronpedia_inference_client.models.activation_topk_by_token_post200_respon
 from neuronpedia_inference_client.models.activation_topk_by_token_post_request import (
     ActivationTopkByTokenPostRequest,
 )
-import pytest
 
-from tests.conftest import BOS_TOKEN_STR, TEST_PROMPT, X_SECRET_KEY, TOPK_BY_TOKEN_ENDPOINT
+from tests.conftest import (
+    BOS_TOKEN_STR,
+    TEST_PROMPT,
+    TOPK_BY_TOKEN_ENDPOINT,
+    X_SECRET_KEY,
+)
 
 
 def test_activation_topk_by_token_basic(client: TestClient):
@@ -40,10 +45,16 @@ def test_activation_topk_by_token_basic(client: TestClient):
 
     # Check that each token has the requested number of top features
     for result in response_model.results:
-        assert len(result.top_features) == 3, f"Expected 3 top features, got {len(result.top_features)}"
+        assert (
+            len(result.top_features) == 3
+        ), f"Expected 3 top features, got {len(result.top_features)}"
         # Check that features are sorted by activation value
-        activation_values = [feature.activation_value for feature in result.top_features]
-        assert activation_values == sorted(activation_values, reverse=True), "Features not sorted by activation value"
+        activation_values = [
+            feature.activation_value for feature in result.top_features
+        ]
+        assert activation_values == sorted(
+            activation_values, reverse=True
+        ), "Features not sorted by activation value"
 
 
 def test_activation_topk_by_token_with_bos(client: TestClient):
@@ -70,7 +81,9 @@ def test_activation_topk_by_token_with_bos(client: TestClient):
 
     # Verify BOS token is included
     assert response_model.tokens[0] == BOS_TOKEN_STR, "BOS token not found at start"
-    assert len(response_model.results) == len(response_model.tokens), "Results length doesn't match tokens length"
+    assert len(response_model.results) == len(
+        response_model.tokens
+    ), "Results length doesn't match tokens length"
 
 
 def test_activation_topk_by_token_invalid_source(client: TestClient):
@@ -91,8 +104,10 @@ def test_activation_topk_by_token_invalid_source(client: TestClient):
             json=request.model_dump(),
             headers={"X-SECRET-KEY": X_SECRET_KEY},
         )
-    
-    assert "Found 0 entries when searching for gpt2-small/invalid-source" in str(excinfo.value)
+
+    assert "Found 0 entries when searching for gpt2-small/invalid-source" in str(
+        excinfo.value
+    )
 
 
 def test_activation_topk_by_token_long_prompt(client: TestClient):
@@ -119,4 +134,4 @@ def test_activation_topk_by_token_long_prompt(client: TestClient):
     assert response.status_code == 400
     data = response.json()
     assert "error" in data
-    assert "Text too long" in data["error"] 
+    assert "Text too long" in data["error"]
