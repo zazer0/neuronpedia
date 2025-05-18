@@ -229,7 +229,7 @@ def process_vector_activations(
     vector = vector.to(dtype=activations.dtype)
     feature_acts = torch.matmul(activations, vector)
     values = feature_acts.squeeze(0).detach().tolist()
-    max_value = max(values)    
+    max_value = max(values)
     return ActivationSinglePost200ResponseActivation(
         values=values,
         max_value=max_value,
