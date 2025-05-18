@@ -228,8 +228,16 @@ def process_vector_activations(
     # ensure vector has the same dtype as activations
     vector = vector.to(dtype=activations.dtype)
     feature_acts = torch.matmul(activations, vector)
+
+    # Inspect shapes for debugging
+    print(f"Activations shape: {activations.shape}")
+    print(f"Vector shape: {vector.shape}")
+
     values = feature_acts.squeeze(0).detach().tolist()
     max_value = max(values)
+
+    print("this is values", values)
+    # print("this is max_value.shape", max_value.shape)
     return ActivationSinglePost200ResponseActivation(
         values=values,
         max_value=max_value,
