@@ -9,6 +9,7 @@ import {
   FilterGraphType,
   MODEL_DIGITS_IN_FEATURE_ID,
   MODEL_HAS_NEURONPEDIA_DASHBOARDS,
+  MODEL_HAS_S3_DASHBOARDS,
   ModelToGraphMetadatasMap,
   convertAnthropicFeatureIdToNeuronpediaSourceSet,
   formatCLTGraphData,
@@ -41,6 +42,7 @@ import {
 const ANTHROPIC_FEATURE_DETAIL_DOWNLOAD_BATCH_SIZE = 32;
 const NEURONPEDIA_FEATURE_DETAIL_DOWNLOAD_BATCH_SIZE = 1024;
 export const GRAPH_PREFETCH_ACTIVATIONS_COUNT = 5;
+const DEFAULT_DENSITY_THRESHOLD = 0.99;
 
 // Define the context type
 type GraphContextType = {
@@ -126,6 +128,8 @@ export function GraphProvider({
   initialClickedId,
   initialSupernodes,
   initialClerps,
+  initialPruningThreshold,
+  initialDensityThreshold,
 }: {
   children: ReactNode;
   initialModelIdToMetadataGraphsMap?: ModelToGraphMetadatasMap;
@@ -135,6 +139,8 @@ export function GraphProvider({
   initialClickedId?: string;
   initialSupernodes?: string[][];
   initialClerps?: string[][];
+  initialPruningThreshold?: number;
+  initialDensityThreshold?: number;
 }) {
   const router = useRouter();
   const session = useSession();
@@ -187,6 +193,8 @@ export function GraphProvider({
     isGridsnap: false,
     supernodes: initialSupernodes || [],
     clerps: initialClerps || [],
+
+    densityThreshold: 1,
   });
 
   const getOriginalClerpForNode = (node: CLTGraphNode) =>
@@ -263,6 +271,8 @@ export function GraphProvider({
             ? JSON.stringify(visState.subgraph.supernodes)
             : null,
         clerps: visState.clerps && visState.clerps.length > 0 ? JSON.stringify(visState.clerps) : null,
+        pruningThreshold: visState.pruningThreshold?.toString() || null,
+        densityThreshold: visState.densityThreshold?.toString() || null,
       };
       updateUrlParams(newParams);
     }
@@ -306,8 +316,11 @@ export function GraphProvider({
           graph.qParams.clickedId && graph.nodes.some((d) => d.nodeId === graph.qParams.clickedId)
             ? graph.qParams.clickedId
             : null,
+        pruningThreshold: graph.metadata.node_threshold,
       };
     }
+
+    visStateToReturn.densityThreshold = 1;
 
     return visStateToReturn;
   }
@@ -359,6 +372,18 @@ export function GraphProvider({
         // override clerps
         if (initialClerps) {
           visStateToSet.clerps = initialClerps;
+        }
+
+        if (initialPruningThreshold) {
+          visStateToSet.pruningThreshold = initialPruningThreshold;
+        }
+
+        if (MODEL_HAS_NEURONPEDIA_DASHBOARDS.has(selectedGraph.metadata.scan)) {
+          if (initialDensityThreshold !== undefined) {
+            visStateToSet.densityThreshold = initialDensityThreshold;
+          } else {
+            visStateToSet.densityThreshold = DEFAULT_DENSITY_THRESHOLD;
+          }
         }
 
         hasAppliedInitialOverrides.current = true;
@@ -499,7 +524,7 @@ export function GraphProvider({
           d.featureDetailNP = feature as NeuronWithPartialRelations;
         }
       });
-    } else {
+    } else if (MODEL_HAS_S3_DASHBOARDS.has(selectedModelId)) {
       // otherwise get the feature from the bucket
       const featureDetails = await fetchInBatches(
         formattedData.nodes,
@@ -517,6 +542,7 @@ export function GraphProvider({
         d.featureDetail = featureDetails[i] as AnthropicFeatureDetail;
       });
     }
+    // neither neuronpedia nor s3 dashboards
 
     setIsLoadingGraphData(false);
     return formattedData;
@@ -561,6 +587,8 @@ export function GraphProvider({
             // Create a new node object with updated activations to trigger re-render
             setNode((prevNode: CLTGraphNode | null) => {
               if (!prevNode || !prevNode.featureDetailNP) return prevNode;
+              // don't change node object if it's a different node now
+              if (prevNode.nodeId !== node?.nodeId) return prevNode;
               return {
                 ...prevNode,
                 featureDetailNP: {
@@ -569,6 +597,13 @@ export function GraphProvider({
                 },
               };
             });
+            // add it to the selectedGraph
+            if (selectedGraph) {
+              const matchingNode = selectedGraph.nodes.find((n) => n.nodeId === node.nodeId);
+              if (matchingNode && matchingNode.featureDetailNP) {
+                matchingNode.featureDetailNP.activations = acts;
+              }
+            }
           }
         })
         .catch((error) => {

@@ -1,7 +1,10 @@
 /* eslint-disable no-param-reassign */
 
 import { useGraphContext } from '@/components/provider/graph-provider';
+import { Input } from '@/components/shadcn/input';
+import { Label } from '@/components/shadcn/label';
 import { useScreenSize } from '@/lib/hooks/use-screen-size';
+import * as RadixSlider from '@radix-ui/react-slider';
 import { useCallback, useEffect, useRef } from 'react';
 import d3 from './d3-jetpack';
 import {
@@ -12,10 +15,9 @@ import {
   featureTypeToText,
   hideTooltip,
   isHideLayer,
+  MODEL_HAS_NEURONPEDIA_DASHBOARDS,
   showTooltip,
 } from './utils';
-
-const HEIGHT = 360;
 
 // Extended type for custom CLTGraph properties
 interface CLTGraphExtended extends CLTGraph {
@@ -334,13 +336,38 @@ export default function LinkGraph() {
     d3.select(svgRef.current).selectAll('*').remove();
 
     const data = selectedGraph as CLTGraphExtended;
-    const { nodes } = data;
+    let { nodes } = data;
+
+    // if metadata shows node_threshold, then we do pruning
+    if (data.metadata.node_threshold !== undefined && data.metadata.node_threshold > 0) {
+      nodes = nodes.filter(
+        (d) =>
+          d.feature_type === 'embedding' ||
+          d.feature_type === 'logit' ||
+          (d.influence !== undefined &&
+            visState.pruningThreshold !== undefined &&
+            d.influence <= visState.pruningThreshold) ||
+          (d.nodeId !== undefined && visState.pinnedIds.includes(d.nodeId)),
+      );
+    }
+
+    // if we have neuronpedia dashboards, then we use density threshold
+    if (MODEL_HAS_NEURONPEDIA_DASHBOARDS.has(selectedGraph?.metadata.scan)) {
+      nodes = nodes.filter(
+        (d) =>
+          d.feature_type === 'embedding' ||
+          d.feature_type === 'logit' ||
+          (d.featureDetailNP?.frac_nonzero !== undefined &&
+            visState.densityThreshold !== undefined &&
+            d.featureDetailNP?.frac_nonzero <= visState.densityThreshold) ||
+          (d.nodeId !== undefined && visState.pinnedIds.includes(d.nodeId)),
+      );
+    }
 
     // Set up the base SVG container
     const svgContainer = d3.select(svgRef.current);
     const svgBBox = svgRef.current.getBoundingClientRect();
-    const { width } = svgBBox;
-    const height = HEIGHT;
+    const { width, height } = svgBBox;
 
     const middleContainer = d3.select(middleRef.current);
     const bottomContainer = d3.select(bottomRef.current);
@@ -355,13 +382,14 @@ export default function LinkGraph() {
       left: isHideLayer(data.metadata.scan) ? 0 : 30,
       right: 20,
       top: 0,
-      bottom: 0,
+      bottom: 45,
     };
 
     const svgBot = bottomContainer.append('g').attr('class', 'svg-bot');
 
     // Create canvas elements for different link layers
-    canvasRefs.current.forEach((_, i) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    canvasRefs.current.forEach((ref, i) => {
       const canvasId = `canvas-layer-${i}`;
 
       // Check if canvas already exists
@@ -542,10 +570,6 @@ export default function LinkGraph() {
 
     const overallS = Math.max(20, d3.min(ctxCounts, (d) => d.minS || 20) || 20);
 
-    // console.log('overallS', overallS, 'ctxCounts', ctxCounts);
-    // console.log('num nodes', nodes.length);
-    // console.log('all nodes ids', nodes.map((d) => d.nodeId).sort());
-
     // Apply to nodes - mutating the nodes array to add position data
     const nestByResult = d3.nestBy(nodes, (d) => [d.ctx_idx, d.streamIdx || 0].join('-'));
     nestByResult.forEach((ctxLayer) => {
@@ -558,16 +582,15 @@ export default function LinkGraph() {
       // Sorting by logitPct stacks all the links
       const sortedLayer = d3.sort(ctxLayer, (d) => -(d.logitPct || 0));
       sortedLayer.forEach((d, i) => {
-        // if (d.feature_type === 'embedding') {
-        //   console.log('in sortedlayer', d.nodeId, d.ppClerp, ctxWidth, padR, i, s, ctxLayer.length);
-        // }
-        // These mutations are kept from the original code but marked explicitly
-        d.xOffset = d.feature_type === 'logit' ? ctxWidth - (padR / 2 + i * s) : ctxWidth - (padR / 2 + i * s);
+        if (d.feature_type === 'embedding') {
+          d.xOffset = c.x(d.ctx_idx + 1) - c.x(d.ctx_idx) - (padR + 3.5);
+        } else {
+          d.xOffset = ctxWidth - (padR / 2 + i * s);
+        }
         // eslint-disable-next-line
         d.yOffset = 0;
       });
     });
-    // console.log('nestByResult length', nestByResult.length);
 
     // Calculate positions for all nodes
     nodes.forEach((d) => {
@@ -578,10 +601,6 @@ export default function LinkGraph() {
 
       const xPos = c.x(d.ctx_idx) + (d.xOffset || 0);
 
-      // if (d.feature_type === 'embedding') {
-      //   console.log(d.nodeId, d.ppClerp);
-      //   console.log(xPos, d.xOffset, d.ctx_idx, d.streamIdx);
-      // }
       const yBand = c.y(effectiveStreamIdx);
       if (yBand === undefined) return;
 
@@ -912,7 +931,7 @@ export default function LinkGraph() {
   }, [screenSize, selectedGraph, visState.hoveredId, visState]);
 
   return (
-    <div className="link-graph relative mt-3 min-h-[415px] flex-1 select-none pt-5">
+    <div className="link-graph relative mt-3 flex-1 select-none">
       {/* <div className="mb-3 mt-2 flex w-full flex-row items-center justify-start gap-x-2">
         <div className="text-sm font-bold text-slate-600">Link Graph</div>
         <CustomTooltip wide trigger={<QuestionMarkCircledIcon className="h-4 w-4 text-slate-500" />}>
@@ -921,10 +940,80 @@ export default function LinkGraph() {
           </div>
         </CustomTooltip>
       </div> */}
+
+      <div className="absolute -top-1 left-3 z-10 flex items-center space-x-7">
+        {selectedGraph?.metadata.node_threshold !== undefined && selectedGraph?.metadata.node_threshold && (
+          <div className="flex flex-row items-center">
+            <Label htmlFor="pruningThreshold" className="text-[10px] text-slate-600">
+              Hide Influence &gt;
+            </Label>
+            <Input
+              id="pruningThreshold"
+              name="pruningThreshold"
+              type="number"
+              value={visState.pruningThreshold?.toFixed(2)}
+              onChange={(e) => updateVisStateField('pruningThreshold', Number(e.target.value))}
+              className="mx-0.5 mr-2 h-5 w-10 rounded border-slate-300 bg-white px-1 py-0 text-center font-mono text-[10px] leading-none sm:text-[10px] md:text-[10px]"
+              min={0}
+              max={1}
+              step={0.01}
+            />
+            <RadixSlider.Root
+              name="pruningThreshold"
+              value={[visState.pruningThreshold || selectedGraph?.metadata.node_threshold]}
+              onValueChange={(newVal: number[]) => updateVisStateField('pruningThreshold', newVal[0])}
+              min={0.2}
+              max={1}
+              step={0.01}
+              className="relative flex h-4 w-16 flex-1 touch-none select-none items-center"
+            >
+              <RadixSlider.Track className="relative h-1 w-full flex-grow overflow-hidden rounded-full bg-slate-200">
+                <RadixSlider.Range className="absolute h-full rounded-full bg-sky-600" />
+              </RadixSlider.Track>
+              <RadixSlider.Thumb className="block h-3 w-3 rounded-full border border-sky-600 bg-white shadow transition-colors focus:outline-none focus:ring-0 disabled:pointer-events-none disabled:opacity-50" />
+            </RadixSlider.Root>
+          </div>
+        )}
+        {selectedGraph?.metadata.scan && MODEL_HAS_NEURONPEDIA_DASHBOARDS.has(selectedGraph?.metadata.scan) && (
+          <div className="flex flex-row items-center">
+            <Label htmlFor="pruningThreshold" className="mr-1 text-center text-[9px] leading-none text-slate-600">
+              Filter Nodes by
+              <br />
+              Feature Density
+            </Label>
+            <Input
+              id="densityThreshold"
+              name="densityThreshold"
+              type="number"
+              value={`${((visState.densityThreshold !== undefined ? visState.densityThreshold : 0.99) * 100).toFixed(0)}`}
+              onChange={(e) => updateVisStateField('densityThreshold', Number(e.target.value))}
+              className="ml-0.5 h-5 w-10 rounded border-slate-300 bg-white px-1 py-0 pr-3 text-center font-mono text-[10px] leading-none sm:text-[10px] md:text-[10px]"
+              min={0}
+              max={1}
+              step={0.01}
+            />
+            <div className="-ml-[11px] mr-2.5 font-mono text-[10px] leading-none text-slate-400">%</div>
+            <RadixSlider.Root
+              name="densityThreshold"
+              value={[visState.densityThreshold !== undefined ? visState.densityThreshold : 0.99]}
+              onValueChange={(newVal: number[]) => updateVisStateField('densityThreshold', newVal[0])}
+              min={0}
+              max={1.0}
+              step={0.01}
+              className="relative flex h-4 w-16 flex-1 touch-none select-none items-center"
+            >
+              <RadixSlider.Track className="relative h-1 w-full flex-grow overflow-hidden rounded-full bg-slate-200">
+                <RadixSlider.Range className="absolute h-full rounded-full bg-sky-600" />
+              </RadixSlider.Track>
+              <RadixSlider.Thumb className="block h-3 w-3 rounded-full border border-sky-600 bg-white shadow transition-colors focus:outline-none focus:ring-0 disabled:pointer-events-none disabled:opacity-50" />
+            </RadixSlider.Root>
+          </div>
+        )}
+      </div>
       <div className="tooltip tooltip-hidden" />
-      <svg className="absolute z-0 w-full" height={HEIGHT} ref={bottomRef} />
-      <svg className="absolute z-0 w-full" height={HEIGHT} ref={middleRef} />
-      <svg className="absolute z-0 w-full" height={HEIGHT} ref={svgRef} />
+      <svg className="absolute top-5 z-0 h-full w-full" ref={bottomRef} />
+      <svg className="absolute top-5 z-0 h-full w-full" ref={middleRef} />
+      <svg className="absolute top-5 z-0 h-full w-full" ref={svgRef} />
     </div>
   );
 }

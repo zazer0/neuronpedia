@@ -21,6 +21,8 @@ export default async function Page({
     pinnedIds?: string;
     supernodes?: string;
     clerps?: string;
+    pruningThreshold?: string;
+    densityThreshold?: string;
   };
 }) {
   const { modelId } = params;
@@ -59,11 +61,11 @@ export default async function Page({
 
   // now look up graphmetadatas in our database
   const graphMetadatas = await prisma.graphMetadata.findMany({
-    where: {
-      modelId: {
-        in: Object.keys(modelIdToGraphMetadatasMap),
-      },
-    },
+    // where: {
+    //   modelId: {
+    //     in: Object.keys(modelIdToGraphMetadatasMap),
+    //   },
+    // },
     include: {
       user: {
         select: {
@@ -111,6 +113,8 @@ export default async function Page({
       initialClickedId={searchParams.clickedId}
       initialSupernodes={parsedSupernodes}
       initialClerps={parsedClerps}
+      initialPruningThreshold={searchParams.pruningThreshold ? Number(searchParams.pruningThreshold) : undefined}
+      initialDensityThreshold={searchParams.densityThreshold ? Number(searchParams.densityThreshold) : undefined}
     >
       <GraphWrapper />
     </GraphProvider>
