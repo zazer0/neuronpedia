@@ -43,7 +43,7 @@ const ANTHROPIC_FEATURE_DETAIL_DOWNLOAD_BATCH_SIZE = 32;
 const NEURONPEDIA_FEATURE_DETAIL_DOWNLOAD_BATCH_SIZE = 1024;
 export const GRAPH_PREFETCH_ACTIVATIONS_COUNT = 5;
 const DEFAULT_DENSITY_THRESHOLD = 0.99;
-const PREFERRED_EXPLANATION_TYPE_NAME = 'np_token-act-pair-logits';
+const PREFERRED_EXPLANATION_TYPE_NAME = 'np_max-act-logits';
 
 // Define the context type
 type GraphContextType = {
@@ -80,6 +80,8 @@ type GraphContextType = {
 
   // getOverrideClerpForNode
   getOverrideClerpForNode: (node: CLTGraphNode) => string | undefined;
+
+  getNodeSupernodeAndOverrideLabel: (node: CLTGraphNode) => string;
 
   // makeTooltipText
   makeTooltipText: (node: CLTGraphNode) => string;
@@ -222,8 +224,31 @@ export function GraphProvider({
     return defaultClerp;
   };
 
-  const makeTooltipText = (node: CLTGraphNode) =>
-    `${getOverrideClerpForNode(node)} | ${node.layer === 'E' ? 'Emb' : node.layer === 'Lgt' ? 'Logit' : `Layer ${node.layer}`}`;
+  const getNodeSupernodeLabel = (node: CLTGraphNode) => {
+    // look in visState.subgraph.supernodes array to check which array item includes this nodeid
+    const supernode = visState.subgraph?.supernodes.find(
+      (sn: string[]) => node.nodeId !== undefined && sn.includes(node.nodeId),
+    );
+    if (supernode) {
+      return `[${supernode.length > 0 ? supernode[0] : ''}] `;
+    }
+    return '';
+  };
+
+  const getNodeSupernodeAndOverrideLabel = (node: CLTGraphNode) => {
+    const supernodeLabel = getNodeSupernodeLabel(node);
+    const overrideClerp = getOverrideClerpForNode(node);
+    // some bug where the supernode label occurs twice
+    if (supernodeLabel.length > 0 && overrideClerp !== undefined && overrideClerp?.startsWith(supernodeLabel)) {
+      return overrideClerp;
+    }
+    return supernodeLabel + overrideClerp;
+  };
+
+  const makeTooltipText = (node: CLTGraphNode) => {
+    const label = getNodeSupernodeAndOverrideLabel(node);
+    return `${label.length === 0 ? 'Unlabeled' : getOverrideClerpForNode(node)} | ${node.layer === 'E' ? 'Emb' : node.layer === 'Lgt' ? 'Logit' : `Layer ${node.layer}`}`;
+  };
 
   const getFilterGraphTypeForCurrentUser = (graph: GraphMetadata) => {
     if (session.data?.user?.id === graph.userId) {
@@ -649,6 +674,7 @@ export function GraphProvider({
       isEditingLabel,
       setIsEditingLabel,
       getOverrideClerpForNode,
+      getNodeSupernodeAndOverrideLabel,
       getOriginalClerpForNode,
       makeTooltipText,
       filterGraphsSetting,
@@ -673,6 +699,7 @@ export function GraphProvider({
       isEditingLabel,
       setIsEditingLabel,
       getOverrideClerpForNode,
+      getNodeSupernodeAndOverrideLabel,
       getOriginalClerpForNode,
       makeTooltipText,
       filterGraphsSetting,
