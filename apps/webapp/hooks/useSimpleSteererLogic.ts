@@ -106,11 +106,22 @@ export function useSimpleSteererLogic<TStrengthConfig>({
     }
   }, [modelId, presetsApiEndpoint, excludedPresetNames, showToastServerError]);
 
+  const resetChatAndMessages = useCallback(() => {
+    setDefaultChatMessages([]);
+    setSteeredChatMessages([]);
+    setTypedInText('');
+    // Note: Component-specific reset logic (like setShowNormalResponse) should be handled in the component
+  }, []);
+
   useEffect(() => {
     console.log('[useSimpleSteererLogic] useEffect to load presets triggered. modelId:', modelId);
+    // Reset states when modelId changes to allow re-initialization for the new model
+    resetChatAndMessages();
+    setSelectedFeatures([]);
+    setHasInitialPresetBeenApplied(false); // Allow initial preset to be applied for the new model
     loadPresets();
     setSeed(STEER_SEED); // Reset seed when model changes, similar to original
-  }, [modelId, loadPresets]);
+  }, [modelId, loadPresets, resetChatAndMessages]); // resetChatAndMessages is stable
 
   useEffect(() => {
     // Auto-select the first preset's features if none are selected yet
@@ -150,13 +161,6 @@ export function useSimpleSteererLogic<TStrengthConfig>({
     // Adding them explicitly for clarity if preferred by project style:
     // setTypedInText, setSelectedFeatures, setDefaultChatMessages, setSteeredChatMessages
   ]);
-
-  const resetChatAndMessages = useCallback(() => {
-    setDefaultChatMessages([]);
-    setSteeredChatMessages([]);
-    setTypedInText('');
-    // Note: Component-specific reset logic (like setShowNormalResponse) should be handled in the component
-  }, []);
 
   const sendChat = useCallback(
     async (overrideTypedInText?: string) => {
