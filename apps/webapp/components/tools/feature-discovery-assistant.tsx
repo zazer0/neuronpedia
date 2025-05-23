@@ -186,7 +186,7 @@ export default function FeatureDiscoveryAssistant() {
           temperature: STEER_TEMPERATURE, nTokens: 96, freqPenalty: STEER_FREQUENCY_PENALTY,
           seed: STEER_SEED, strengthMultiplier: STEER_STRENGTH_MULTIPLIER, steerSpecialTokens: STEER_SPECIAL_TOKENS,
         });
-        const assistantMessage = steeringData?.STEERED?.chatTemplate?.findLast(msg => msg.role === 'model')?.content;
+        const assistantMessage = steeringData?.STEERED?.chatTemplate?.findLast(msg => msg.role === 'model' || msg.role === 'assistant')?.content;
         return { ...featureToSteer, steeredText: assistantMessage || 'No response text.', steeringError: undefined, isSteeringLoading: false };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Steering request failed';
