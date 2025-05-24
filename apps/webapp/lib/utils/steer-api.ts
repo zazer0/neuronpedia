@@ -24,13 +24,27 @@ export interface SteerChatApiRequestPayload {
 
 export interface SteerChatApiResponse {
   STEERED?: {
+    raw: string;
     chatTemplate: ChatMessage[];
     // other fields might exist but are not needed for this step
   } | null;
   DEFAULT?: {
+    raw: string;
     chatTemplate: ChatMessage[];
     // other fields might exist
   } | null;
+  id?: string;
+  shareUrl?: string;
+  limit?: string;
+  settings?: {
+    temperature: number;
+    n_tokens: number;
+    freq_penalty: number;
+    seed: number;
+    strength_multiplier: number;
+    steer_special_tokens: boolean;
+    steer_method: string;
+  };
   // Potentially other fields like error messages if the API returns them in a structured way
 }
 

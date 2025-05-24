@@ -17,6 +17,7 @@ import {
 } from '@/lib/utils/steer';
 import { callSteerChatApi } from '@/lib/utils/steer-api'; // Import the new utility
 // import { ExplanationWithPartialRelations } from '@/prisma/generated/zod'; // No longer directly used in this component's props/state
+import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 // Define a type for our structured feature suggestion
@@ -36,6 +37,7 @@ type FeatureSteeringResult = SuggestedSteerFeature & {
 
 export default function FeatureDiscoveryAssistant() {
   const { getDefaultModel, getInferenceEnabledModels, showToastServerError } = useGlobalContext();
+  const envApiKey = process.env.NEXT_PUBLIC_NEURONPEDIA_APIKEY;
   const [modelId, setModelId] = useState<string>(getDefaultModel()?.id || '');
   const [testPrompt, setTestPrompt] = useState<string>('');
   const [featureQuery, setFeatureQuery] = useState<string>('');
@@ -51,6 +53,9 @@ export default function FeatureDiscoveryAssistant() {
   const [userInteracted, setUserInteracted] = useState<boolean>(false);
   const [triggerAutoSteer, setTriggerAutoSteer] = useState<boolean>(false);
 
+  // Add API key state variables
+  const [apiKey, setApiKey] = useState('');
+  const [isApiKeySectionOpen, setIsApiKeySectionOpen] = useState(false);
 
   const handleSearch = async () => {
     // Reset timer and interaction states on new search
@@ -183,8 +188,13 @@ export default function FeatureDiscoveryAssistant() {
           defaultChatMessages: [{ role: 'user', content: testPrompt }] as SteerChatMessage[],
           steeredChatMessages: [{ role: 'user', content: testPrompt }] as SteerChatMessage[],
           features: [apiFeature],
-          temperature: STEER_TEMPERATURE, nTokens: 96, freqPenalty: STEER_FREQUENCY_PENALTY,
-          seed: STEER_SEED, strengthMultiplier: STEER_STRENGTH_MULTIPLIER, steerSpecialTokens: STEER_SPECIAL_TOKENS,
+          temperature: STEER_TEMPERATURE,
+          nTokens: 96,
+          freqPenalty: STEER_FREQUENCY_PENALTY,
+          seed: STEER_SEED,
+          strengthMultiplier: STEER_STRENGTH_MULTIPLIER,
+          steerSpecialTokens: STEER_SPECIAL_TOKENS,
+          ...(apiKey.trim() && { apiKey: apiKey.trim() }),
         });
         const assistantMessage = steeringData?.STEERED?.chatTemplate?.findLast(msg => msg.role === 'model' || msg.role === 'assistant')?.content;
         return { ...featureToSteer, steeredText: assistantMessage || 'No response text.', steeringError: undefined, isSteeringLoading: false };
@@ -229,7 +239,7 @@ export default function FeatureDiscoveryAssistant() {
         return existingGlobalFeatureResult;
       })
     );
-  }, [suggestedFeatures, modelId, testPrompt, showToastServerError]);
+  }, [suggestedFeatures, modelId, testPrompt, showToastServerError, apiKey]);
 
   useEffect(() => {
     if (triggerAutoSteer) {
@@ -330,6 +340,33 @@ export default function FeatureDiscoveryAssistant() {
           </label>
           <p className="text-xs text-slate-500">E.g., &quot;social isolation&quot;, &quot;positive sentiment&quot;, &quot;code generation&quot;</p>
         </div>
+      </div>
+
+      {/* Add API Key Section after the existing inputs */}
+      <div className="flex flex-col">
+        <button
+          type="button"
+          onClick={() => setIsApiKeySectionOpen(prevState => !prevState)}
+          className="text-xs text-slate-400 hover:text-slate-600 mt-2 flex items-center justify-center w-full rounded-md focus:outline-none focus:ring-1 focus:ring-slate-400 disabled:opacity-50"
+          disabled={isLoading}
+        >
+          Configure API Key
+          {isApiKeySectionOpen ? (
+            <ChevronUpIcon className="h-4 w-4 ml-1" />
+          ) : (
+            <ChevronDownIcon className="h-4 w-4 ml-1" />
+          )}
+        </button>
+        {isApiKeySectionOpen && (
+          <input
+            type="text"
+            placeholder={envApiKey && !apiKey.trim() ? 'API Key (Optional, using ENV)' : 'API Key (Optional)'}
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            className="mt-1 w-full rounded-md border border-slate-300 bg-transparent px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={isLoading}
+          />
+        )}
       </div>
 
       <Button onClick={handleSearch} disabled={isLoading || !modelId || !testPrompt.trim() || !featureQuery.trim()}>
