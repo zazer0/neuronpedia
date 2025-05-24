@@ -139,7 +139,7 @@ export default function FeatureDiscoveryAssistant() {
   // Function to get baseline (unsteered) output
   const getBaselineOutput = async () => {
     if (!modelId || !testPrompt.trim()) return;
-    
+
     setIsGettingBaseline(true);
     try {
       const modelToSteer = (modelId !== 'gemma-2-2b') ? modelId : 'gemma-2-2b-it';
@@ -286,6 +286,7 @@ export default function FeatureDiscoveryAssistant() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {EXAMPLE_PROMPTS.map((example, idx) => (
               <button
+                type="button"
                 key={idx}
                 onClick={() => {
                   setTestPrompt(example.prompt);
@@ -381,7 +382,7 @@ export default function FeatureDiscoveryAssistant() {
             disabled={!modelId}
             className="w-full h-12 rounded-md border border-slate-300 bg-white px-4 py-3 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-slate-100"
           />
-          <p className="text-xs text-slate-500 mt-2">The prompt that will be used to test how features affect the model's output</p>
+          <p className="text-xs text-slate-500 mt-2">The prompt that will be used to test how features affect the model&apos;s output</p>
         </div>
 
         <div className={`bg-slate-50 rounded-lg p-4 transition-opacity ${!testPrompt.trim() ? 'opacity-50' : ''}`}>
@@ -410,8 +411,8 @@ export default function FeatureDiscoveryAssistant() {
       </div>
 
       <div className="flex justify-center mt-8">
-        <Button 
-          onClick={handleSearch} 
+        <Button
+          onClick={handleSearch}
           disabled={isLoading || !modelId || !testPrompt.trim() || !featureQuery.trim()}
           size="lg"
           className="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-8 py-4 text-base font-semibold"
@@ -587,7 +588,7 @@ export default function FeatureDiscoveryAssistant() {
                   strength: f.strength,
                   explanation: f.originalExplanation,
                   selected: f.isSelected,
-                  steeredOutput: steeringResults.find(sr => 
+                  steeredOutput: steeringResults.find(sr =>
                     sr.modelId === f.modelId && sr.layer === f.layer && sr.index === f.index
                   )?.steeredText
                 })),
@@ -611,7 +612,7 @@ export default function FeatureDiscoveryAssistant() {
             size="sm"
             onClick={() => {
               const selectedFeatures = suggestedFeatures.filter(f => f.isSelected);
-              const text = selectedFeatures.map(f => 
+              const text = selectedFeatures.map(f =>
                 `${f.modelId}:${f.layer}:${f.index}`
               ).join(',');
               navigator.clipboard.writeText(text);
