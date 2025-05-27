@@ -1,3 +1,5 @@
+from typing import Optional
+
 from neuronpedia.np_source_set import SourceSet
 from neuronpedia.requests.base_request import NPRequest
 
@@ -5,8 +7,9 @@ from neuronpedia.requests.base_request import NPRequest
 class SourceSetRequest(NPRequest):
     def __init__(
         self,
+        api_key: Optional[str] = None,
     ):
-        super().__init__("source-set")
+        super().__init__("source-set", api_key=api_key)
 
     def new(
         self,
