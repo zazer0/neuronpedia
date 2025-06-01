@@ -1,3 +1,4 @@
+import ATTRIBUTION_GRAPH_SCHEMA from '@/app/api/graph/graph-schema.json';
 import { DEFAULT_CREATOR_USER_ID, NEXT_PUBLIC_URL } from '@/lib/env';
 import { GraphMetadata, GraphMetadataWithPartialRelations, NeuronWithPartialRelations } from '@/prisma/generated/zod';
 import cuid from 'cuid';
@@ -6,22 +7,31 @@ import d3 from './d3-jetpack';
 // TODO: make this an env variable
 export const NP_GRAPH_BUCKET = 'neuronpedia-attrib';
 
-export const MAX_GRAPH_UPLOAD_SIZE_BYTES = 200 * 1024 * 1024;
+export const ANT_BUCKET_URL = 'https://transformer-circuits.pub/2025/attribution-graphs';
+
+export const MAX_GRAPH_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024;
 
 // ============ Neuronpedia Specific =============
 
 // TODO: make this a DB column
 // models not in this list can only get FeatureDetails from the bucket
-export const MODEL_HAS_NEURONPEDIA_DASHBOARDS = new Set(['gemma-2-2b']);
+export const MODEL_WITH_NP_DASHBOARDS_NOT_YET_CANTOR = new Set(['gemma-2-2b']);
+// TODO: remove the MODEL_WITH_NP_DASHBOARDS_NOT_YET_CANTOR once fellows graph gets on cantor
+export const graphModelHasNpDashboards = (graph: CLTGraph) =>
+  MODEL_WITH_NP_DASHBOARDS_NOT_YET_CANTOR.has(graph.metadata.scan) ||
+  graph.metadata.feature_details?.neuronpedia_source_set !== undefined;
 
 // has dashboards in the bucket
 export const MODEL_HAS_S3_DASHBOARDS = new Set([
+  'llama-3.2-1b',
   'llama-3-131k-relu',
   'jackl-circuits-runs-1-4-sofa-v3_0',
   'jackl-circuits-runs-1-1-druid-cp_0',
   'jackl-circuits-runs-12-19-valet-m_0',
   'jackl-circuits-runs-1-12-rune-cp3_0',
 ]);
+
+export const ANT_MODELS_TO_LOAD = new Set(['jackl-circuits-runs-1-4-sofa-v3_0']);
 
 // if neither, then no dashboards yet for them
 
@@ -43,6 +53,8 @@ export const ANT_MODEL_ID_TO_NEURONPEDIA_MODEL_ID = {
   'gemma-2-2b': 'gemma-2-2b',
   'llama-3-131k-relu': 'llama-3.2-1b',
 };
+
+export const ERROR_MODEL_DOES_NOT_EXIST = 'ERR_MODEL_DOES_NOT_EXIST';
 
 // ============ End of Neuronpedia Specific =============
 
@@ -86,11 +98,11 @@ export function getGraphBaseUrlToName(url: string) {
   if (key) {
     return GRAPH_BASE_URL_TO_NAME[key as keyof typeof GRAPH_BASE_URL_TO_NAME];
   }
-  return '';
+  return null;
 }
 
 export function makeGraphPublicAccessGraphUri(modelId: string, slug: string) {
-  return `/${modelId}/graph?model=${modelId}&slug=${slug}`;
+  return `/${modelId}/graph?slug=${slug}`;
 }
 
 export function makeGraphPublicAccessGraphUrl(modelId: string, slug: string) {
@@ -98,13 +110,6 @@ export function makeGraphPublicAccessGraphUrl(modelId: string, slug: string) {
 }
 
 export type AnthropicGraphMetadata = {
-  // // neuronpedia-specific
-  // baseUrl: string | undefined;
-  // filterGraphType: FilterGraphType | undefined;
-  // userId: string | undefined;
-  // userName: string | undefined;
-
-  // // common with others
   slug: string;
   scan: string;
   prompt_tokens: string[];
@@ -170,10 +175,8 @@ export type CltSubgraphState = {
 export type CltVisState = {
   pinnedIds: string[];
   hiddenIds: string[];
-  hoveredId: string | null;
   hoveredNodeId: string | null;
   hoveredCtxIdx: number | null;
-  clickedId: string | null;
   clickedCtxIdx: number | null;
   linkType: string;
   isShowAllLinks: string;
@@ -201,23 +204,7 @@ export const modelIdToModelDisplayName = new Map<string, string>([
   ['jackl-circuits-runs-1-1-druid-cp_0', '18L'],
   ['jackl-circuits-runs-12-19-valet-m_0', 'Model Organism'],
   ['jackl-circuits-runs-1-12-rune-cp3_0', '18L PLTs'],
-  ['gemma-2-2b', 'Gemma 2 2B'],
   ['llama-3-131k-relu', 'Llama 3.2 1B - Relu'],
-  ['gelu-4l-x128k64-v0', 'Gelu 4L'],
-  ['gpt2-small', 'GPT2-Small'],
-  // ['llama-hf-3-nobos', 'Llama 3.2 1B - NoBos'],
-  // ['llama-hf-3', 'Llama 3.2 1B - Other'],
-]);
-
-export const supportedGraphModels = new Set([
-  'jackl-circuits-runs-1-4-sofa-v3_0',
-  'jackl-circuits-runs-1-1-druid-cp_0',
-  'jackl-circuits-runs-12-19-valet-m_0',
-  'jackl-circuits-runs-1-12-rune-cp3_0',
-  'gemma-2-2b',
-  'llama-3-131k-relu',
-  'gelu-4l-x128k64-v0',
-  'gpt2-small',
 ]);
 
 export const anthropicModels = [
@@ -227,21 +214,12 @@ export const anthropicModels = [
   'jackl-circuits-runs-1-12-rune-cp3_0',
 ];
 
-export const scanSlugToName = {
-  h35: 'jackl-circuits-runs-1-4-sofa-v3_0',
-  '18l': 'jackl-circuits-runs-1-1-druid-cp_0',
-  moc: 'jackl-circuits-runs-12-19-valet-m_0',
-};
-
 export const cltModelToNumLayers = {
   'jackl-circuits-runs-1-4-sofa-v3_0': 18,
   'jackl-circuits-runs-1-1-druid-cp_0': 18,
   'jackl-circuits-runs-12-19-valet-m_0': 16,
   'jackl-circuits-runs-1-12-rune-cp3_0': 18,
-  'gemma-2-2b': 26,
   'llama-3-131k-relu': 16,
-  'gelu-4l-x128k64-v0': 4,
-  'gpt2-small': 12,
 };
 
 export type CLTGraphInnerMetadata = {
@@ -254,6 +232,43 @@ export type CLTGraphInnerMetadata = {
   // default value for cltVisState.pruningThreshold
   // filters out > node.influence values
   node_threshold?: number;
+
+  // add the extra metadata from graph-schema.json
+  feature_details?: {
+    feature_json_base_url?: string;
+    neuronpedia_source_set?: string;
+  };
+  info?: {
+    description?: string;
+    creator_name?: string;
+    creator_url?: string;
+    source_urls?: string[];
+    generator?: {
+      name?: string;
+      version?: string;
+      url?: string;
+      email?: string;
+    };
+    create_time_ms?: number;
+  };
+  generation_settings?: {
+    max_n_logits?: number;
+    desired_logit_prob?: number;
+    batch_size?: number;
+    max_feature_nodes?: number;
+  };
+  pruning_settings?: {
+    node_threshold?: number;
+    edge_threshold?: number;
+  };
+
+  // we add these ourselves
+  // subset of our DB Model
+  neuronpedia_internal_model?: {
+    id: string;
+    displayName: string;
+    layers: number;
+  };
 };
 
 export type CLTGraphQParams = {
@@ -335,6 +350,14 @@ export type CLTGraphNode = {
 
   // added for dynamic pruning
   influence?: number;
+
+  // for fellows graphs only
+  activation?: number;
+
+  // test hover links
+  tmpHoveredLink?: CLTGraphLink;
+  tmpHoveredSourceLink?: CLTGraphLink;
+  tmpHoveredTargetLink?: CLTGraphLink;
 };
 
 export type CLTGraphLink = {
@@ -355,6 +378,8 @@ export type CLTGraphLink = {
 
   tmpClickedCtxOffset?: number;
   tmpColor?: string;
+
+  tmpHoveredCtxOffset?: number;
 };
 
 export type CLTGraph = {
@@ -371,7 +396,7 @@ export enum FilterGraphType {
 }
 
 export function isHideLayer(scan: string) {
-  return scan === scanSlugToName.h35 || scan === scanSlugToName.moc || scan === 'gpt2-small';
+  return scan === 'jackl-circuits-runs-1-4-sofa-v3_0';
 }
 
 // ========= util-cg.js formatData equivalent =========
@@ -496,25 +521,25 @@ export function formatCLTGraphData(data: CLTGraph, logitDiff: string | null): CL
     pyNodeIdToNode[d.node_id] = d;
   });
 
-  // delete features that occur in than 2/3 of tokens
-  // TODO: more principled way of filtering them out — maybe by feature density?
-  const deletedFeatures: CLTGraphNode[][] = [];
-  const byFeatureId = d3.nestBy(nodes, (d) => d.featureId || '');
-  byFeatureId.forEach((feature) => {
-    if (feature.length > (metadata.prompt_tokens.length * 2) / 3) {
-      deletedFeatures.push(feature);
-      feature.forEach((d) => {
-        if (d.nodeId) delete idToNode[d.nodeId];
-        if (d.node_id) delete pyNodeIdToNode[d.node_id];
-      });
-    }
-  });
-  //   if (deletedFeatures.length) console.log({ deletedFeatures });
+  // // delete features that occur in than 2/3 of tokens
+  // // SPECIAL CASE: for eleuther graphs don't do the filtering out
+  // if (!MODEL_DO_NOT_FILTER_NODES.has(metadata.scan)) {
+  //   const deletedFeatures: CLTGraphNode[][] = [];
+  //   const byFeatureId = d3.nestBy(nodes, (d) => d.featureId || '');
+  //   byFeatureId.forEach((feature) => {
+  //     if (feature.length > (metadata.prompt_tokens.length * 2) / 3) {
+  //       deletedFeatures.push(feature);
+  //       feature.forEach((d) => {
+  //         if (d.nodeId) delete idToNode[d.nodeId];
+  //         if (d.node_id) delete pyNodeIdToNode[d.node_id];
+  //       });
+  //     }
+  //   });
+  //   //   if (deletedFeatures.length) console.log({ deletedFeatures });
 
-  // SPECIAL CASE: for eleuther graphs don't do the filtering out
-  if (!MODEL_DO_NOT_FILTER_NODES.has(metadata.scan)) {
-    nodes = nodes.filter((d) => (d.nodeId ? idToNode[d.nodeId] : false));
-  }
+  //   nodes = nodes.filter((d) => (d.nodeId ? idToNode[d.nodeId] : false));
+  // }
+
   nodes = d3.sort(nodes, (d) => +d.layer);
 
   links = links.filter((d) => pyNodeIdToNode[d.source] && pyNodeIdToNode[d.target]);
@@ -619,48 +644,6 @@ export function hideTooltip() {
   d3.select('.tooltip').classed('tooltip-hidden', true);
 }
 
-const keysToSkip = new Set([
-  'node_id',
-  'jsNodeId',
-  'nodeId',
-  'layerLocationLabel',
-  'remoteClerp',
-  'localClerp',
-  'tmpClickedTargetLink',
-  'tmpClickedLink',
-  'tmpClickedSourceLink',
-  'pos',
-  'xOffset',
-  'yOffset',
-  'sourceLinks',
-  'targetLinks',
-  'url',
-  'vis_link',
-  'run_idx',
-  'featureId',
-  'active_feature_idx',
-  'nodeIndex',
-  'isFeature',
-  'Distribution',
-  'clerp',
-  'ppClerp',
-  'is_target_logit',
-  'token_prob',
-  'reverse_ctx_idx',
-  'ctx_from_end',
-  'feature',
-  'logitToken',
-  'featureIndex',
-  'streamIdx',
-  'nodeColor',
-  'umap_enc_x',
-  'umap_enc_y',
-  'umap_dec_x',
-  'umap_dec_y',
-  'umap_concat_x',
-  'umap_concat_y',
-]);
-
 export function showTooltip(ev: MouseEvent, d: CLTGraphNode, overrideClerp?: string) {
   const tooltipSel = d3.select('.tooltip');
   const x = ev.clientX;
@@ -670,18 +653,25 @@ export function showTooltip(ev: MouseEvent, d: CLTGraphNode, overrideClerp?: str
   const left = d3.clamp(20, x - bb.width / 2, window.innerWidth - bb.width - 20);
   const top = window.innerHeight > y + 20 + bb.height ? y + 20 : y - bb.height - 20;
 
-  const tooltipHtml = !ev.metaKey
-    ? overrideClerp || d.ppClerp || `F#${d.feature}`
-    : Object.keys(d)
-        // @ts-ignore
-        .filter((str) => typeof d[str] !== 'object' && typeof d[str] !== 'function' && !keysToSkip.has(str))
-        .map((str) => {
-          // @ts-ignore
-          let val = d[str];
-          if (typeof val === 'number' && !Number.isInteger(val)) val = val.toFixed(6);
-          return `<div>${str}: <b>${val}</b></div>`;
-        })
-        .join('');
+  const clerp = overrideClerp || d.ppClerp || `F#${d.feature}`;
+
+  const tooltipHtml = `<div className="text-center flex flex-col items-center justify-center">
+  ${clerp}
+  ${ev.metaKey ? `<div className="text-slate-400 text-center mt-1 text-[7px]" > Holding CMD/Ctrl: Click to Pin to Subgraph</div>` : ''}
+</div>`;
+  // if (ev.metaKey) {
+  //   tooltipHtml += `<div className="text-slate-400 text-center mt-1 text-[7px]">Holding CMD/Ctrl: Click to Pin to Subgraph</div>`;
+  // Object.keys(d)
+  // // @ts-ignore
+  // .filter((str) => typeof d[str] !== 'object' && typeof d[str] !== 'function' && !keysToSkip.has(str) && d[str])
+  // .map((str) => {
+  //   // @ts-ignore
+  //   let val = d[str];
+  //   if (typeof val === 'number' && !Number.isInteger(val)) val = val.toFixed(6);
+  //   return `<div>${str}: <b>${val}</b></div>`;
+  // })
+  // .join('');
+  // }
 
   tooltipSel.style('left', `${left}px`).style('top', `${top}px`).html(tooltipHtml).classed('tooltip-hidden', false);
 }
@@ -692,6 +682,13 @@ export function featureTypeToText(type: string): string {
   if (type === 'embedding') return '■';
   if (type === 'mlp reconstruction error') return '◆';
   return '●';
+}
+
+export function featureTypeToTextSize(isMobile: boolean, type: string): number {
+  if (isMobile && type === 'mlp reconstruction error') {
+    return 7;
+  }
+  return 14;
 }
 
 export type AnthropicFeatureExample = {
@@ -713,3 +710,104 @@ export type AnthropicFeatureDetail = {
   index: number;
   examples_quantiles: AnthropicFeatureExampleQuantile[];
 };
+
+export { ATTRIBUTION_GRAPH_SCHEMA };
+
+// filtering utils for influence and density
+
+export function shouldShowNodeForInfluenceThreshold(
+  node: CLTGraphNode,
+  visState: CltVisState,
+  clickedId: string | null,
+): boolean {
+  // always show embeddings and logits
+  if (node.feature_type === 'embedding' || node.feature_type === 'logit') {
+    return true;
+  }
+
+  // always show pinned nodes
+  if (node.nodeId !== undefined && visState.pinnedIds.includes(node.nodeId)) {
+    return true;
+  }
+
+  // always show clicked nodes
+  if (clickedId !== null && node.nodeId === clickedId) {
+    return true;
+  }
+
+  // if we have influence and pruning threshold, show if influence is less than pruning threshold
+  if (
+    node.influence !== undefined &&
+    node.influence !== null &&
+    visState.pruningThreshold !== undefined &&
+    visState.pruningThreshold !== null
+  ) {
+    if (node.influence <= visState.pruningThreshold) {
+      return true;
+    }
+    return false;
+  }
+  // no influence and pruning threshold. show all.
+  return true;
+}
+
+export function shouldShowNodeForDensityThreshold(
+  isNPDashboard: boolean,
+  d: CLTGraphNode,
+  visState: CltVisState,
+  clickedId: string | null,
+): boolean {
+  if (!isNPDashboard) {
+    return true;
+  }
+
+  // always show embeddings and logits
+  if (d.feature_type === 'embedding' || d.feature_type === 'logit') {
+    return true;
+  }
+
+  // always show pinned nodes
+  if (d.nodeId !== undefined && visState.pinnedIds.includes(d.nodeId)) {
+    return true;
+  }
+
+  if (clickedId !== null && d.nodeId === clickedId) {
+    return true;
+  }
+
+  // show if density threshold is met
+  if (
+    d.featureDetailNP?.frac_nonzero !== undefined &&
+    d.featureDetailNP?.frac_nonzero !== null &&
+    visState.densityThreshold !== undefined &&
+    visState.densityThreshold !== null
+  ) {
+    const shouldShow = d.featureDetailNP?.frac_nonzero <= visState.densityThreshold;
+    return shouldShow;
+  }
+  // no density threshold. show all.
+  return true;
+}
+
+// Extended type for custom CLTGraph properties
+export interface CLTGraphExtended extends CLTGraph {
+  byStream?: Array<any>;
+  features?: Array<any>;
+}
+
+export function filterNodes(
+  data: CLTGraphExtended,
+  nodes: CLTGraphNode[],
+  selectedGraph: CLTGraph,
+  visState: CltVisState,
+  clickedId: string | null,
+) {
+  if (data.metadata.node_threshold !== undefined && data.metadata.node_threshold > 0) {
+    nodes = nodes.filter((d) => shouldShowNodeForInfluenceThreshold(d, visState, clickedId));
+  }
+  // if we have neuronpedia dashboards, then we use density threshold
+  nodes = nodes.filter((d) =>
+    shouldShowNodeForDensityThreshold(graphModelHasNpDashboards(selectedGraph), d, visState, clickedId),
+  );
+  return nodes;
+}

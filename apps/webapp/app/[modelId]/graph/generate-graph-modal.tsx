@@ -1,8 +1,9 @@
 'use client';
 
 import { useGlobalContext } from '@/components/provider/global-provider';
+import { useGraphModalContext } from '@/components/provider/graph-modal-provider';
 import { Button } from '@/components/shadcn/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/shadcn/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/shadcn/dialog';
 import { Input } from '@/components/shadcn/input';
 import { Label } from '@/components/shadcn/label';
 import { LoadingSquare } from '@/components/svg/loading-square';
@@ -17,6 +18,9 @@ import {
   GRAPH_GENERATION_ENABLED_MODELS,
   GRAPH_MAX_PROMPT_LENGTH_CHARS,
   GRAPH_MAX_TOKENS,
+  GRAPH_MAXFEATURENODES_DEFAULT,
+  GRAPH_MAXFEATURENODES_MAX,
+  GRAPH_MAXFEATURENODES_MIN,
   GRAPH_MAXNLOGITS_DEFAULT,
   GRAPH_MAXNLOGITS_MAX,
   GRAPH_MAXNLOGITS_MIN,
@@ -24,13 +28,14 @@ import {
   GRAPH_NODETHRESHOLD_MAX,
   GRAPH_NODETHRESHOLD_MIN,
   graphGenerateSchemaClient,
+  RUNPOD_BUSY_ERROR,
 } from '@/lib/utils/graph';
 import { ResetIcon } from '@radix-ui/react-icons';
 import * as RadixSelect from '@radix-ui/react-select';
 import * as RadixSlider from '@radix-ui/react-slider';
 import { Form, Formik, FormikHelpers, FormikProps } from 'formik';
 import _ from 'lodash';
-import { ChevronDownIcon, ChevronUpIcon, Plus } from 'lucide-react';
+import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactTextareaAutosize from 'react-textarea-autosize';
@@ -42,6 +47,7 @@ interface FormValues {
   desiredLogitProb: number;
   nodeThreshold: number;
   edgeThreshold: number;
+  maxFeatureNodes: number;
   slug: string;
 }
 
@@ -90,13 +96,13 @@ const formatCountdown = (totalSeconds: number): string => {
 };
 
 export default function GenerateGraphModal() {
-  const [isOpen, setIsOpen] = useState(false);
+  const { isGenerateGraphModalOpen, setIsGenerateGraphModalOpen } = useGraphModalContext();
   const [generationResult, setGenerationResult] = useState<GenerateGraphResponse | null>(null);
   const [tokenizedPrompt, setTokenizedPrompt] = useState<TokenizeResponse | null>(null);
   const [estimatedTime, setEstimatedTime] = useState<number | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isTokenizing, setIsTokenizing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<React.ReactNode | null>(null);
   const [countdownTime, setCountdownTime] = useState<number | null>(null);
 
   const session = useSession();
@@ -110,12 +116,20 @@ export default function GenerateGraphModal() {
     desiredLogitProb: GRAPH_DESIREDLOGITPROB_DEFAULT,
     nodeThreshold: GRAPH_NODETHRESHOLD_DEFAULT,
     edgeThreshold: GRAPH_EDGETHRESHOLD_DEFAULT,
+    maxFeatureNodes: GRAPH_MAXFEATURENODES_DEFAULT,
     slug: '',
   };
+
+  const [endsWithSpace, setEndsWithSpace] = useState(false);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const debouncedTokenize = useCallback(
     _.debounce(async (modelId: string, prompt: string) => {
+      if (prompt.endsWith(' ')) {
+        setEndsWithSpace(true);
+      } else {
+        setEndsWithSpace(false);
+      }
       if (!prompt.trim() || !modelId) {
         setTokenizedPrompt(null);
         setEstimatedTime(null);
@@ -135,6 +149,7 @@ export default function GenerateGraphModal() {
           throw new Error(errorData.message || 'Failed to tokenize prompt');
         }
         const data = (await response.json()) as TokenizeResponse;
+
         setTokenizedPrompt(data);
         if (data.tokens) {
           setEstimatedTime(getEstimatedTimeFromNumTokens(data.tokens.length));
@@ -189,11 +204,6 @@ export default function GenerateGraphModal() {
   }, [isGenerating, estimatedTime]);
 
   const handleSubmit = async (values: FormValues, { setSubmitting }: FormikHelpers<FormValues>) => {
-    if (!session.data?.user) {
-      setSignInModalOpen(true);
-      setSubmitting(false);
-      return;
-    }
     setIsGenerating(true);
     setError(null);
     setGenerationResult(null);
@@ -206,8 +216,14 @@ export default function GenerateGraphModal() {
       });
 
       const responseData = await response.json();
-
       if (!response.ok) {
+        if (response.status === 429) {
+          throw new Error('Rate limit exceeded. Users are limited to 10 graphs per hour - please try again later.');
+        }
+        if (responseData.error === RUNPOD_BUSY_ERROR) {
+          // TODO special limit display
+          throw new Error('Oops - looks like we are at capacity right now. Please try again in a minute!');
+        }
         throw new Error(responseData.message || responseData.error || 'Failed to generate graph.');
       }
 
@@ -221,7 +237,24 @@ export default function GenerateGraphModal() {
       }
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
-      setError(errorMessage);
+      if (e instanceof Error && e.message === RUNPOD_BUSY_ERROR) {
+        setError(
+          <>
+            Oops - looks like we are at capacity right now, please try again in a minute. You can also go to{' '}
+            <a
+              href="https://github.com/safety-research/circuit-tracer"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sky-600 underline hover:text-sky-800"
+            >
+              https://github.com/safety-research/circuit-tracer
+            </a>{' '}
+            to run it yourself in Colab or on a local machine.
+          </>,
+        );
+      } else {
+        setError(errorMessage);
+      }
       if (showToast) {
         showToast({
           title: 'Error Generating Graph',
@@ -234,22 +267,6 @@ export default function GenerateGraphModal() {
       setSubmitting(false);
     }
   };
-
-  if (!session.data?.user && !isOpen) {
-    return (
-      <Button
-        variant="outline"
-        size="sm"
-        className="flex h-12 items-center justify-center border-slate-300"
-        onClick={() => {
-          setSignInModalOpen(true);
-        }}
-        title="Generate Graph (Login Required)"
-      >
-        <Plus className="h-4 w-4" />
-      </Button>
-    );
-  }
 
   const handleOpenChange = (open: boolean) => {
     if (!open && isGenerating) {
@@ -271,26 +288,44 @@ export default function GenerateGraphModal() {
         formikRef.current.resetForm();
       }
     }
-    setIsOpen(open);
+    setIsGenerateGraphModalOpen(open);
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          title="Generate Graph"
-          aria-label="Generate Graph"
-          size="sm"
-          className="flex h-12 items-center justify-center whitespace-nowrap border-emerald-500 bg-emerald-50 text-xs font-medium leading-none text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700"
-        >
-          <Plus className="mr-1.5 h-4 w-4" /> New Graph
-        </Button>
-      </DialogTrigger>
+    <Dialog open={isGenerateGraphModalOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="z-[10001] cursor-default select-none bg-white text-slate-700 sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Generate New Graph</DialogTitle>
+          <DialogDescription className="text-sm text-slate-600">
+            Generate a new attribution graph for a custom prompt. Powered by{' '}
+            <a
+              href="https://github.com/safety-research/circuit-tracer"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sky-600 hover:text-sky-800 hover:underline"
+            >
+              circuit-tracer
+            </a>
+            .
+          </DialogDescription>
         </DialogHeader>
+
+        {!session?.data?.user && (
+          <p className="mt-1 rounded-md bg-amber-100 p-3 text-xs text-amber-700">
+            {`You aren't signed in, so you'll need to manually keep track of any graphs you generate. To automatically save graphs to your account, `}
+            <Button
+              variant="link"
+              onClick={() => {
+                setSignInModalOpen(true);
+                setIsGenerateGraphModalOpen(false);
+              }}
+              className="h-auto cursor-pointer px-0 py-0 text-xs font-medium text-amber-800 underline md:text-xs"
+            >
+              sign up with one click
+            </Button>
+            .
+          </p>
+        )}
         {!generationResult ? (
           <Formik
             innerRef={formikRef}
@@ -305,11 +340,16 @@ export default function GenerateGraphModal() {
                   modelId={values.modelId}
                   debouncedTokenize={debouncedTokenize}
                 />
-                <Form className="space-y-2">
+                <Form className="space-y-0">
                   <div>
                     <Label htmlFor="prompt" className="text-xs">
                       Prompt
                     </Label>
+                    <p className="mt-0.5 text-[11.5px] text-slate-500">
+                      In general, you want your prompt to be missing a word at the end, because we want to analyze how
+                      the model comes up with the word <strong>after</strong> your prompt. (Eg &quot;The capital of the
+                      state containing Dallas is&quot;)
+                    </p>
                     <ReactTextareaAutosize
                       id="prompt"
                       name="prompt"
@@ -317,18 +357,22 @@ export default function GenerateGraphModal() {
                       value={values.prompt}
                       onChange={handleChange}
                       onBlur={handleBlur}
+                      onKeyDown={(e) => {
+                        e.stopPropagation();
+                      }}
+                      disabled={isGenerating}
                       placeholder="Enter the prompt to visualize..."
                       className="mt-1 w-full resize-none rounded-md border border-slate-300 p-2 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
                       maxLength={GRAPH_MAX_PROMPT_LENGTH_CHARS}
                     />
                     {isTokenizing ? (
-                      <div className="mt-1.5 flex w-full flex-row items-center justify-start gap-x-0.5 text-xs text-sky-700">
+                      <div className="mt-1.5 flex w-full flex-row items-center justify-start gap-x-0.5 pb-2 text-xs text-sky-700">
                         <LoadingSquare className="mr-1 h-5 w-5" size={20} />
                         <div className="flex items-center justify-start">Tokenizing...</div>
                       </div>
                     ) : (
                       tokenizedPrompt && (
-                        <div className="mx-1 mt-1 text-xs text-slate-500">
+                        <div className="mx-1 mt-1 pb-2 text-xs text-slate-500">
                           <div className="mb-1">{tokenizedPrompt.tokens.length} Tokens</div>
                           <div className="flex flex-wrap gap-x-1 gap-y-[3px]">
                             {tokenizedPrompt.tokenStrings.map((t, idx) => (
@@ -340,6 +384,13 @@ export default function GenerateGraphModal() {
                               </span>
                             ))}
                           </div>
+                          {endsWithSpace && (
+                            <p className="mt-1.5 text-[11px] text-amber-600">
+                              Warning: Your prompt ends with a space, which may result in an unexpected next token
+                              because tokens often already have a space prepended (eg &quot; cat&quot;, &quot;
+                              coffee&quot;). Consider removing the ending space if this is not what you intended.
+                            </p>
+                          )}
                         </div>
                       )
                     )}
@@ -351,18 +402,51 @@ export default function GenerateGraphModal() {
                     )}
                   </div>
 
-                  <div className="flex flex-row gap-x-3">
+                  <div className="flex-1 pb-4">
+                    <Label htmlFor="slug" className="text-xs text-slate-600">
+                      Name Your Graph (Slug/ID)
+                    </Label>
+                    <Input
+                      id="slug"
+                      name="slug"
+                      value={values.slug}
+                      onChange={(e) => {
+                        const val = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+                        setFieldValue('slug', val);
+                      }}
+                      onKeyDown={(e) => {
+                        e.stopPropagation();
+                      }}
+                      onBlur={handleBlur}
+                      disabled={isGenerating}
+                      placeholder="my-graph"
+                      className="mt-1 w-full border-slate-300 text-xs placeholder-slate-400"
+                      maxLength={50}
+                    />
+                    {errors.slug && touched.slug && <p className="mt-1 text-xs text-red-500">{errors.slug}</p>}
+                  </div>
+
+                  <div className="hidden items-center pt-1 sm:flex">
+                    <div className="mr-3 flex-1 border-t border-slate-200" />
+                    <span className="text-[11px] text-slate-500">Advanced Settings</span>
+                    <div className="ml-3 flex-1 border-t border-slate-200" />
+                  </div>
+                  <div className="hidden flex-row gap-x-3 pt-2 sm:flex">
                     <div className="flex-1">
-                      <Label htmlFor="modelId" className="text-xs text-slate-600">
+                      <Label
+                        htmlFor="modelId"
+                        className="h-6 w-12 border-slate-300 px-0 text-left text-slate-600 md:text-[11px]"
+                      >
                         Model
                       </Label>
                       <RadixSelect.Root
                         value={values.modelId}
                         onValueChange={(value: string) => setFieldValue('modelId', value)}
+                        disabled={isGenerating}
                       >
                         <RadixSelect.Trigger
                           id="modelId"
-                          className="mt-1 flex w-full items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 placeholder-slate-400 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="mt-1 flex w-full items-center justify-between rounded-md border border-slate-300 bg-slate-200 px-3 py-2 text-xs text-slate-500 placeholder-slate-400 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <RadixSelect.Value placeholder="Select a model" />
                           <RadixSelect.Icon className="text-slate-500">
@@ -395,27 +479,12 @@ export default function GenerateGraphModal() {
                         <p className="mt-1 text-xs text-red-500">{errors.modelId}</p>
                       )}
                     </div>
-                    <div className="flex-1">
-                      <Label htmlFor="slug" className="text-xs text-slate-600">
-                        Slug / Identifier
-                      </Label>
-                      <Input
-                        id="slug"
-                        name="slug"
-                        value={values.slug}
-                        onChange={(e) => {
-                          const val = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '');
-                          setFieldValue('slug', val);
-                        }}
-                        onBlur={handleBlur}
-                        placeholder="my-graph"
-                        className="mt-1 w-full border-slate-300 text-xs placeholder-slate-400"
-                        maxLength={50}
-                      />
-                      {errors.slug && touched.slug && <p className="mt-1 text-xs text-red-500">{errors.slug}</p>}
-                    </div>
+
                     <div>
-                      <Label htmlFor="maxNLogits" className="text-xs text-slate-600">
+                      <Label
+                        htmlFor="maxNLogits"
+                        className="h-6 w-12 border-slate-300 px-0 text-center text-slate-600 md:text-[11px]"
+                      >
                         Max # Logits
                       </Label>
                       <Input
@@ -423,9 +492,10 @@ export default function GenerateGraphModal() {
                         name="maxNLogits"
                         type="number"
                         value={values.maxNLogits}
+                        disabled={isGenerating}
                         onChange={handleChange}
                         onBlur={handleBlur}
-                        className="mt-1 w-20 border-slate-300 text-xs"
+                        className="mt-1 w-full border-slate-300 text-center text-xs md:text-xs"
                         min={GRAPH_MAXNLOGITS_MIN}
                         max={GRAPH_MAXNLOGITS_MAX}
                         step={1}
@@ -436,79 +506,197 @@ export default function GenerateGraphModal() {
                     </div>
                   </div>
 
-                  {[
-                    {
-                      name: 'desiredLogitProb',
-                      label: 'Desired Logit Probability',
-                      min: GRAPH_DESIREDLOGITPROB_MIN,
-                      max: GRAPH_DESIREDLOGITPROB_MAX,
-                      step: 0.01,
-                      defaultValue: GRAPH_DESIREDLOGITPROB_DEFAULT,
-                      hint: `Target cumulative probability for top N logits. Higher means more logits included. Min: ${GRAPH_DESIREDLOGITPROB_MIN}, Max: ${GRAPH_DESIREDLOGITPROB_MAX}.`,
-                    },
-                    {
-                      name: 'nodeThreshold',
-                      label: 'Node Threshold',
-                      min: GRAPH_NODETHRESHOLD_MIN,
-                      max: GRAPH_NODETHRESHOLD_MAX,
-                      step: 0.01,
-                      defaultValue: GRAPH_NODETHRESHOLD_DEFAULT,
-                      hint: `Minimum activation value for a node to be included. Min: ${GRAPH_NODETHRESHOLD_MIN}, Max: ${GRAPH_NODETHRESHOLD_MAX}.`,
-                    },
-                    {
-                      name: 'edgeThreshold',
-                      label: 'Edge Threshold',
-                      min: GRAPH_EDGETHRESHOLD_MIN,
-                      max: GRAPH_EDGETHRESHOLD_MAX,
-                      step: 0.01,
-                      defaultValue: GRAPH_EDGETHRESHOLD_DEFAULT,
-                      hint: `Minimum attention weight for an edge to be included. Min: ${GRAPH_EDGETHRESHOLD_MIN}, Max: ${GRAPH_EDGETHRESHOLD_MAX}.`,
-                    },
-                  ].map((field) => (
-                    <div key={field.name}>
-                      <Label htmlFor={field.name} className="flex items-center text-xs text-slate-600">
-                        {field.label}
-                      </Label>
-                      <div className="mt-1 flex items-center space-x-2">
-                        <Input
-                          id={field.name}
-                          name={field.name}
-                          type="number"
-                          value={values[field.name as keyof FormValues]}
-                          onChange={handleChange}
-                          onBlur={handleBlur}
-                          className="h-7 w-20 border-slate-300 text-xs"
-                          min={field.min}
-                          max={field.max}
-                          step={field.step}
-                        />
-                        <RadixSlider.Root
-                          name={field.name}
-                          value={[Number(values[field.name as keyof FormValues])]}
-                          onValueChange={(newVal: number[]) => setFieldValue(field.name, newVal[0])}
-                          min={field.min}
-                          max={field.max}
-                          step={field.step}
-                          className="relative flex h-4 w-full flex-1 touch-none select-none items-center"
-                        >
-                          <RadixSlider.Track className="relative h-1.5 w-full flex-grow overflow-hidden rounded-full bg-slate-200">
-                            <RadixSlider.Range className="absolute h-full rounded-full bg-sky-600" />
-                          </RadixSlider.Track>
-                          <RadixSlider.Thumb className="block h-4 w-4 rounded-full border-2 border-sky-600 bg-white shadow transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50" />
-                        </RadixSlider.Root>
-                      </div>
-                      {errors[field.name as keyof FormValues] && touched[field.name as keyof FormValues] && (
-                        <p className="mt-1 text-xs text-red-500">{errors[field.name as keyof FormValues]}</p>
-                      )}
+                  {/* Attribution Settings Group */}
+                  <div className="hidden space-y-0 pt-3 sm:block">
+                    <div className="text-left text-[10px] font-medium uppercase leading-none text-slate-400">
+                      Attribution
                     </div>
-                  ))}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label
+                          htmlFor="desiredLogitProb"
+                          className="h-6 w-12 border-slate-300 px-0 text-left text-slate-500 md:text-[11px]"
+                        >
+                          Desired Logit Probability
+                        </Label>
+                        <div className="mt-0.5 flex items-center space-x-2">
+                          <Input
+                            id="desiredLogitProb"
+                            name="desiredLogitProb"
+                            type="number"
+                            value={values.desiredLogitProb}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            disabled={isGenerating}
+                            className="h-6 w-12 border-slate-300 px-0 text-center text-slate-600 md:text-[11px]"
+                            min={GRAPH_DESIREDLOGITPROB_MIN}
+                            max={GRAPH_DESIREDLOGITPROB_MAX}
+                            step={0.01}
+                          />
+                          <RadixSlider.Root
+                            name="desiredLogitProb"
+                            value={[values.desiredLogitProb]}
+                            onValueChange={(newVal: number[]) => setFieldValue('desiredLogitProb', newVal[0])}
+                            min={GRAPH_DESIREDLOGITPROB_MIN}
+                            max={GRAPH_DESIREDLOGITPROB_MAX}
+                            disabled={isGenerating}
+                            step={0.01}
+                            className="relative flex h-4 w-full flex-1 touch-none select-none items-center"
+                          >
+                            <RadixSlider.Track className="relative h-1.5 w-full flex-grow overflow-hidden rounded-full bg-slate-200">
+                              <RadixSlider.Range className="absolute h-full rounded-full bg-sky-600" />
+                            </RadixSlider.Track>
+                            <RadixSlider.Thumb className="block h-4 w-4 rounded-full border-2 border-sky-600 bg-white shadow transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50" />
+                          </RadixSlider.Root>
+                        </div>
+                        {errors.desiredLogitProb && touched.desiredLogitProb && (
+                          <p className="mt-1 text-xs text-red-500">{errors.desiredLogitProb}</p>
+                        )}
+                      </div>
+
+                      {/* Max # Nodes */}
+                      <div>
+                        <Label
+                          htmlFor="maxFeatureNodes"
+                          className="h-6 w-12 border-slate-300 px-0 text-left text-slate-500 md:text-[11px]"
+                        >
+                          Max # Nodes
+                        </Label>
+                        <div className="mt-0.5 flex items-center space-x-2">
+                          <Input
+                            id="maxFeatureNodes"
+                            name="maxFeatureNodes"
+                            type="number"
+                            value={values.maxFeatureNodes}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            disabled={isGenerating}
+                            className="h-6 w-12 border-slate-300 px-0 text-center text-slate-600 md:text-[11px]"
+                            min={GRAPH_MAXFEATURENODES_MIN}
+                            max={GRAPH_MAXFEATURENODES_MAX}
+                            step={1}
+                          />
+                          <RadixSlider.Root
+                            name="maxFeatureNodes"
+                            value={[values.maxFeatureNodes]}
+                            onValueChange={(newVal: number[]) => setFieldValue('maxFeatureNodes', newVal[0])}
+                            min={GRAPH_MAXFEATURENODES_MIN}
+                            max={GRAPH_MAXFEATURENODES_MAX}
+                            disabled={isGenerating}
+                            step={500}
+                            className="relative flex h-4 w-full flex-1 touch-none select-none items-center"
+                          >
+                            <RadixSlider.Track className="relative h-1.5 w-full flex-grow overflow-hidden rounded-full bg-slate-200">
+                              <RadixSlider.Range className="absolute h-full rounded-full bg-sky-600" />
+                            </RadixSlider.Track>
+                            <RadixSlider.Thumb className="block h-4 w-4 rounded-full border-2 border-sky-600 bg-white shadow transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50" />
+                          </RadixSlider.Root>
+                        </div>
+                        {errors.maxFeatureNodes && touched.maxFeatureNodes && (
+                          <p className="mt-1 text-xs text-red-500">{errors.maxFeatureNodes}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Pruning Settings Group */}
+                  <div className="hidden space-y-0 pb-3 pt-3 sm:block">
+                    <div className="text-left text-[10px] font-medium uppercase leading-none text-slate-400">
+                      Pruning
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Node Threshold and Edge Threshold on same line */}
+                      <div>
+                        <Label
+                          htmlFor="nodeThreshold"
+                          className="h-6 w-12 border-slate-300 px-0 text-left text-slate-500 md:text-[11px]"
+                        >
+                          Node Threshold
+                        </Label>
+                        <div className="mt-0.5 flex items-center space-x-2">
+                          <Input
+                            id="nodeThreshold"
+                            name="nodeThreshold"
+                            type="number"
+                            value={values.nodeThreshold}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            disabled={isGenerating}
+                            className="h-6 w-12 border-slate-300 px-0 text-center text-slate-600 md:text-[11px]"
+                            min={GRAPH_NODETHRESHOLD_MIN}
+                            max={GRAPH_NODETHRESHOLD_MAX}
+                            step={0.01}
+                          />
+                          <RadixSlider.Root
+                            name="nodeThreshold"
+                            value={[values.nodeThreshold]}
+                            onValueChange={(newVal: number[]) => setFieldValue('nodeThreshold', newVal[0])}
+                            min={GRAPH_NODETHRESHOLD_MIN}
+                            max={GRAPH_NODETHRESHOLD_MAX}
+                            disabled={isGenerating}
+                            step={0.01}
+                            className="relative flex h-4 w-full flex-1 touch-none select-none items-center"
+                          >
+                            <RadixSlider.Track className="relative h-1.5 w-full flex-grow overflow-hidden rounded-full bg-slate-200">
+                              <RadixSlider.Range className="absolute h-full rounded-full bg-sky-600" />
+                            </RadixSlider.Track>
+                            <RadixSlider.Thumb className="block h-4 w-4 rounded-full border-2 border-sky-600 bg-white shadow transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50" />
+                          </RadixSlider.Root>
+                        </div>
+                        {errors.nodeThreshold && touched.nodeThreshold && (
+                          <p className="mt-1 text-xs text-red-500">{errors.nodeThreshold}</p>
+                        )}
+                      </div>
+                      <div>
+                        <Label
+                          htmlFor="edgeThreshold"
+                          className="h-6 w-12 border-slate-300 px-0 text-left text-slate-500 md:text-[11px]"
+                        >
+                          Edge Threshold
+                        </Label>
+                        <div className="mt-0.5 flex items-center space-x-2">
+                          <Input
+                            id="edgeThreshold"
+                            name="edgeThreshold"
+                            type="number"
+                            value={values.edgeThreshold}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            disabled={isGenerating}
+                            className="h-6 w-12 border-slate-300 px-0 text-center text-slate-600 md:text-[11px]"
+                            min={GRAPH_EDGETHRESHOLD_MIN}
+                            max={GRAPH_EDGETHRESHOLD_MAX}
+                            step={0.01}
+                          />
+                          <RadixSlider.Root
+                            name="edgeThreshold"
+                            value={[values.edgeThreshold]}
+                            onValueChange={(newVal: number[]) => setFieldValue('edgeThreshold', newVal[0])}
+                            min={GRAPH_EDGETHRESHOLD_MIN}
+                            max={GRAPH_EDGETHRESHOLD_MAX}
+                            disabled={isGenerating}
+                            step={0.01}
+                            className="relative flex h-4 w-full flex-1 touch-none select-none items-center"
+                          >
+                            <RadixSlider.Track className="relative h-1.5 w-full flex-grow overflow-hidden rounded-full bg-slate-200">
+                              <RadixSlider.Range className="absolute h-full rounded-full bg-sky-600" />
+                            </RadixSlider.Track>
+                            <RadixSlider.Thumb className="block h-4 w-4 rounded-full border-2 border-sky-600 bg-white shadow transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50" />
+                          </RadixSlider.Root>
+                        </div>
+                        {errors.edgeThreshold && touched.edgeThreshold && (
+                          <p className="mt-1 text-xs text-red-500">{errors.edgeThreshold}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
                   {error && <p className="mt-4 rounded-md bg-red-100 p-3 text-sm text-red-600">{error}</p>}
 
-                  <div className="flex items-center justify-between pt-3">
+                  <div className="mt-4 flex items-center justify-between border-t pt-4 text-xs">
                     {isGenerating ? (
-                      countdownTime !== null && countdownTime > 0 ? (
-                        <div className="flex flex-row items-center justify-start gap-x-1.5 text-sm text-slate-600">
+                      countdownTime !== null ? (
+                        <div className="flex flex-row items-center justify-start gap-x-1.5 text-sm text-slate-500">
                           <LoadingSquare className="h-4 w-4" size={12} />
                           Remaining time: {formatCountdown(countdownTime)}
                         </div>
@@ -518,7 +706,7 @@ export default function GenerateGraphModal() {
                         <div className="text-sm text-slate-600">Estimating time...</div>
                       )
                     ) : estimatedTime !== null && !generationResult ? (
-                      <div className="flex flex-row items-center justify-start gap-x-1.5 text-sm text-slate-600">
+                      <div className="flex flex-row items-center justify-start gap-x-1.5 text-xs text-slate-500">
                         Estimated generation time:{' '}
                         {estimatedTime < 60
                           ? `~${Math.round(estimatedTime)} sec`
@@ -527,7 +715,7 @@ export default function GenerateGraphModal() {
                     ) : (
                       <div /> // Empty div to maintain layout for button alignment
                     )}
-                    <div className="flex flex-row gap-x-2">
+                    <div className="flex w-full flex-row justify-end gap-x-2">
                       <Button
                         type="button"
                         variant="outline"
@@ -558,7 +746,6 @@ export default function GenerateGraphModal() {
                           isGenerating ||
                           !dirty ||
                           Object.keys(errors).length > 0 ||
-                          isTokenizing ||
                           (tokenizedPrompt !== null && tokenizedPrompt.tokens.length > GRAPH_MAX_TOKENS)
                         }
                         className="w-full sm:w-auto"
@@ -584,7 +771,6 @@ export default function GenerateGraphModal() {
               <strong>URL:</strong>{' '}
               <a
                 href={generationResult.url}
-                target="_blank"
                 rel="noopener noreferrer"
                 className="break-all text-sky-700 hover:underline"
               >
