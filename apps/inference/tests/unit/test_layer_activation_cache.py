@@ -2,14 +2,13 @@
 # ABOUTME: Tests LRU eviction, cache hits/misses, and proper recency tracking
 
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 import torch
 from transformer_lens import ActivationCache
 
 from neuronpedia_inference.layer_activation_cache import (
-    CacheEntry,
     LayerActivationCache,
 )
 

@@ -3,10 +3,6 @@
 
 import json
 
-import pytest
-from neuronpedia_inference_client.models.np_steer_completion_response_inner import (
-    NPSteerCompletionResponseInner,
-)
 from neuronpedia_inference_client.models.np_steer_type import NPSteerType
 
 from neuronpedia_inference.endpoints.steer.completion import (

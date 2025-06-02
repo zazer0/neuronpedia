@@ -3,7 +3,6 @@
 
 import asyncio
 import time
-from typing import Dict, List
 
 import pytest
 from fastapi.testclient import TestClient

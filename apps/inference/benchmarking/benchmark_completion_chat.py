@@ -380,9 +380,9 @@ class CompletionChatBenchmark:
     def compare_results(self, before_file: str, after_file: str):
         """Compare before and after optimization results."""
         try:
-            with open(before_file, "r") as f:
+            with open(before_file) as f:
                 before = json.load(f)
-            with open(after_file, "r") as f:
+            with open(after_file) as f:
                 after = json.load(f)
             
             console.print("\n[bold green]Optimization Comparison[/bold green]")
