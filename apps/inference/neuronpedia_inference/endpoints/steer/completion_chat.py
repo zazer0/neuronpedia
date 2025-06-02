@@ -83,10 +83,23 @@ async def completion_chat(request: SteerCompletionChatPostRequest):
     # tokenize = True adds a BOS
     if model.tokenizer is None:
         raise ValueError("Tokenizer is not initialized")
-    promptTokenized = model.tokenizer.apply_chat_template(
-        promptChatFormatted, tokenize=True, add_generation_prompt=True
-    )
-    promptTokenized = torch.tensor(promptTokenized)
+    
+    # Check if the model supports chat templates
+    if hasattr(model.tokenizer, 'chat_template') and model.tokenizer.chat_template is not None:
+        promptTokenized = model.tokenizer.apply_chat_template(
+            promptChatFormatted, tokenize=True, add_generation_prompt=True
+        )
+        promptTokenized = torch.tensor(promptTokenized)
+    else:
+        # Fallback for models without chat template support (e.g., GPT-2)
+        # Format messages as simple text: "Role: content\n"
+        formatted_text = ""
+        for message in promptChatFormatted:
+            formatted_text += f"{message['role'].capitalize()}: {message['content']}\n"
+        formatted_text += "Assistant:"  # Add generation prompt
+        
+        # Tokenize the formatted text
+        promptTokenized = model.to_tokens(formatted_text)[0]
 
     # logger.info("promptTokenized: %s", promptTokenized)
     if len(promptTokenized) > config.TOKEN_LIMIT:
@@ -194,25 +207,32 @@ async def run_batched_generate(
                         bos_indices = (
                             current_tokens == model.tokenizer.bos_token_id
                         ).nonzero(as_tuple=True)[0]  # type: ignore
-                        start_of_turn_indices = (
-                            current_tokens
-                            == model.tokenizer.encode("<start_of_turn>")[0]
-                        ).nonzero(as_tuple=True)[0]
-                        end_of_turn_indices = (
-                            current_tokens == model.tokenizer.encode("<end_of_turn>")[0]
-                        ).nonzero(as_tuple=True)[0]
-
+                        
                         # Apply masking rules
                         # 1. Don't steer <bos>
                         mask[bos_indices] = 0
+                        
+                        # Only check for chat-specific tokens if the model supports them
+                        if hasattr(model.tokenizer, 'chat_template') and model.tokenizer.chat_template is not None:
+                            try:
+                                start_of_turn_indices = (
+                                    current_tokens
+                                    == model.tokenizer.encode("<start_of_turn>")[0]
+                                ).nonzero(as_tuple=True)[0]
+                                end_of_turn_indices = (
+                                    current_tokens == model.tokenizer.encode("<end_of_turn>")[0]
+                                ).nonzero(as_tuple=True)[0]
 
-                        # 2. Don't steer <start_of_turn> and the next two tokens
-                        for idx in start_of_turn_indices:
-                            mask[idx : idx + 3] = 0
+                                # 2. Don't steer <start_of_turn> and the next two tokens
+                                for idx in start_of_turn_indices:
+                                    mask[idx : idx + 3] = 0
 
-                        # 3. Don't steer <end_of_turn> and the next token
-                        for idx in end_of_turn_indices:
-                            mask[idx : idx + 2] = 0
+                                # 3. Don't steer <end_of_turn> and the next token
+                                for idx in end_of_turn_indices:
+                                    mask[idx : idx + 2] = 0
+                            except Exception:
+                                # Model doesn't have these special tokens, skip
+                                pass
                     # Apply steering with the mask
                     for feature in features:
                         steering_vector = torch.tensor(feature.steering_vector).to(
