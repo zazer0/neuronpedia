@@ -245,8 +245,8 @@ class ActivationProcessor:
             return torch.transpose(mlp_activation_data[0], 0, 1)
 
         # Check if we have cached SAE features
-        layer_cache = LayerActivationCache.get_instance()
-        layer_num = self._get_layer_num(selected_source)
+        # layer_cache = LayerActivationCache.get_instance()
+        # layer_num = self._get_layer_num(selected_source)
 
         # Try to get from the tokens used to create this cache
         # Note: This is a simplified approach - in production you'd want to track tokens properly

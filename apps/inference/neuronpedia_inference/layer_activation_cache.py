@@ -6,7 +6,7 @@ import logging
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 import torch
 from transformer_lens import ActivationCache
@@ -56,14 +56,14 @@ class LayerActivationCache:
         return hashlib.sha256(token_bytes).hexdigest()[:16]
 
     def _make_cache_key(
-        self, token_hash: str, layer_num: int, stop_at_layer: Optional[int]
+        self, token_hash: str, layer_num: int, stop_at_layer: int | None
     ) -> str:
         """Create a cache key from token hash and layer info."""
         return f"{token_hash}_L{layer_num}_stop{stop_at_layer}"
 
     def get(
-        self, tokens: torch.Tensor, layer_num: int, stop_at_layer: Optional[int] = None
-    ) -> Optional[CacheEntry]:
+        self, tokens: torch.Tensor, layer_num: int, stop_at_layer: int | None = None
+    ) -> CacheEntry | None:
         """
         Retrieve cached activations for given tokens and layer.
         Updates access order and statistics.
@@ -91,7 +91,7 @@ class LayerActivationCache:
         tokens: torch.Tensor,
         layer_num: int,
         activation_cache: ActivationCache,
-        stop_at_layer: Optional[int] = None,
+        stop_at_layer: int | None = None,
     ) -> None:
         """
         Store activations in cache, evicting oldest entry if needed.
@@ -128,7 +128,7 @@ class LayerActivationCache:
         layer_num: int,
         hook_name: str,
         activation: torch.Tensor,
-        stop_at_layer: Optional[int] = None,
+        stop_at_layer: int | None = None,
     ) -> None:
         """Add raw activation tensor to existing cache entry."""
         token_hash = self._compute_token_hash(tokens)
@@ -143,7 +143,7 @@ class LayerActivationCache:
         layer_num: int,
         sae_id: str,
         features: torch.Tensor,
-        stop_at_layer: Optional[int] = None,
+        stop_at_layer: int | None = None,
     ) -> None:
         """Add SAE-encoded features to existing cache entry."""
         token_hash = self._compute_token_hash(tokens)
@@ -157,8 +157,8 @@ class LayerActivationCache:
         tokens: torch.Tensor,
         layer_num: int,
         sae_id: str,
-        stop_at_layer: Optional[int] = None,
-    ) -> Optional[torch.Tensor]:
+        stop_at_layer: int | None = None,
+    ) -> torch.Tensor | None:
         """Retrieve cached SAE features if available."""
         entry = self.get(tokens, layer_num, stop_at_layer)
         if entry and sae_id in entry.sae_features:
@@ -205,4 +205,3 @@ class LayerActivationCache:
             f"hit_rate={stats['hit_rate']:.2%}, "
             f"evictions={stats['evictions']}"
         )
-

@@ -197,4 +197,3 @@ class TestLayerActivationCache:
         # Should have 3 entries (limited by max_entries)
         assert len(cache.cache) == 3
         assert cache.evictions == 2  # Two entries were evicted
-

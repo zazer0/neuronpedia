@@ -33,7 +33,7 @@ class TestSteerCompletion:
         )
         assert steered_output.output == steered_result
 
-        # Check default output  
+        # Check default output
         default_output = next(
             output for output in response.outputs if output.type == NPSteerType.DEFAULT
         )
@@ -78,7 +78,7 @@ class TestSteerCompletion:
         # Validate JSON structure
         assert "outputs" in parsed
         assert len(parsed["outputs"]) == 2
-        
+
         # Check that both outputs are present
         output_types = [output["type"] for output in parsed["outputs"]]
         assert "STEERED" in output_types
@@ -91,7 +91,7 @@ class TestSteerCompletion:
         default_json = next(
             output for output in parsed["outputs"] if output["type"] == "DEFAULT"
         )
-        
+
         assert steered_json["output"] == steered_result
         assert default_json["output"] == default_result
 
@@ -102,16 +102,16 @@ class TestSteerCompletion:
         response = make_steer_completion_response(
             steer_types, "steered text", "default text"
         )
-        
+
         assert response.outputs[0].type == NPSteerType.STEERED
         assert response.outputs[1].type == NPSteerType.DEFAULT
 
-        # Test DEFAULT first, then STEERED  
+        # Test DEFAULT first, then STEERED
         steer_types = [NPSteerType.DEFAULT, NPSteerType.STEERED]
         response = make_steer_completion_response(
             steer_types, "steered text", "default text"
         )
-        
+
         assert response.outputs[0].type == NPSteerType.DEFAULT
         assert response.outputs[1].type == NPSteerType.STEERED
 
@@ -128,7 +128,7 @@ class TestSteerCompletion:
         """Test handling of long output strings."""
         steer_types = [NPSteerType.STEERED, NPSteerType.DEFAULT]
         long_text = "This is a very long text " * 100  # 2500+ characters
-        
+
         response = make_steer_completion_response(steer_types, long_text, long_text)
 
         assert len(response.outputs) == 2
@@ -141,13 +141,15 @@ class TestSteerCompletion:
         """Test handling of special characters in outputs."""
         steer_types = [NPSteerType.STEERED, NPSteerType.DEFAULT]
         special_text = 'Text with "quotes", newlines\n, and unicode: 🌟'
-        
-        response = make_steer_completion_response(steer_types, special_text, special_text)
+
+        response = make_steer_completion_response(
+            steer_types, special_text, special_text
+        )
 
         # Should handle special characters without issues
         json_str = response.to_json()
         parsed = json.loads(json_str)
-        
+
         for output in parsed["outputs"]:
             assert output["output"] == special_text
 
@@ -156,7 +158,7 @@ class TestSteerCompletion:
         steer_types = [NPSteerType.STEERED, NPSteerType.DEFAULT]
         steered_content = "Steered response with specific content A"
         default_content = "Default response with specific content B"
-        
+
         response = make_steer_completion_response(
             steer_types, steered_content, default_content
         )

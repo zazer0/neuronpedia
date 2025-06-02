@@ -177,8 +177,9 @@ async def run_batched_generate(
             batched_input = tokenized.unsqueeze(0).repeat(2, 1)  # Shape: [2, seq_len]
 
             def batched_steering_hook(
-                activations: torch.Tensor, hook: Any
-            ) -> torch.Tensor:  # noqa: ARG001
+                activations: torch.Tensor,
+                hook: Any,  # noqa: ARG001
+            ) -> torch.Tensor:
                 # Apply steering only to the first item in batch (index 0)
                 for _, steering_vector, coeff in processed_steering_vectors:
                     if steer_method == NPSteerMethod.SIMPLE_ADDITIVE:
@@ -314,7 +315,7 @@ async def sequential_generate(
 
 
 async def generate_single_completion(
-    prompt: str,
+    prompt: str,  # noqa: ARG001
     features: list[NPSteerFeature] | list[NPSteerVector],
     steer_type: NPSteerType,
     strength_multiplier: float,

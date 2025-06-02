@@ -83,9 +83,12 @@ async def completion_chat(request: SteerCompletionChatPostRequest):
     # tokenize = True adds a BOS
     if model.tokenizer is None:
         raise ValueError("Tokenizer is not initialized")
-    
+
     # Check if the model supports chat templates
-    if hasattr(model.tokenizer, 'chat_template') and model.tokenizer.chat_template is not None:
+    if (
+        hasattr(model.tokenizer, "chat_template")
+        and model.tokenizer.chat_template is not None
+    ):
         promptTokenized = model.tokenizer.apply_chat_template(
             promptChatFormatted, tokenize=True, add_generation_prompt=True
         )
@@ -97,7 +100,7 @@ async def completion_chat(request: SteerCompletionChatPostRequest):
         for message in promptChatFormatted:
             formatted_text += f"{message['role'].capitalize()}: {message['content']}\n"
         formatted_text += "Assistant:"  # Add generation prompt
-        
+
         # Tokenize the formatted text
         promptTokenized = model.to_tokens(formatted_text)[0]
 
@@ -207,20 +210,24 @@ async def run_batched_generate(
                         bos_indices = (
                             current_tokens == model.tokenizer.bos_token_id
                         ).nonzero(as_tuple=True)[0]  # type: ignore
-                        
+
                         # Apply masking rules
                         # 1. Don't steer <bos>
                         mask[bos_indices] = 0
-                        
+
                         # Only check for chat-specific tokens if the model supports them
-                        if hasattr(model.tokenizer, 'chat_template') and model.tokenizer.chat_template is not None:
+                        if (
+                            hasattr(model.tokenizer, "chat_template")
+                            and model.tokenizer.chat_template is not None
+                        ):
                             try:
                                 start_of_turn_indices = (
                                     current_tokens
                                     == model.tokenizer.encode("<start_of_turn>")[0]
                                 ).nonzero(as_tuple=True)[0]
                                 end_of_turn_indices = (
-                                    current_tokens == model.tokenizer.encode("<end_of_turn>")[0]
+                                    current_tokens
+                                    == model.tokenizer.encode("<end_of_turn>")[0]
                                 ).nonzero(as_tuple=True)[0]
 
                                 # 2. Don't steer <start_of_turn> and the next two tokens
@@ -274,10 +281,12 @@ async def run_batched_generate(
         if generate_both:
             # Try batch generation with different steering for each batch item
             logger.info("Attempting batch generation for steered and default")
-            
+
             # Create batched input (2 copies of the same prompt)
-            batched_input = promptTokenized.unsqueeze(0).repeat(2, 1)  # Shape: [2, seq_len]
-            
+            batched_input = promptTokenized.unsqueeze(0).repeat(
+                2, 1
+            )  # Shape: [2, seq_len]
+
             # Create the batched steering hook
             batched_hook = create_batched_steering_hook(
                 promptTokenized=promptTokenized,
@@ -287,7 +296,7 @@ async def run_batched_generate(
                 normalize_steering=normalize_steering,
                 steer_special_tokens=steer_special_tokens,
             )
-            
+
             # Set up hooks
             model.reset_hooks()
             editing_hooks = [
@@ -301,12 +310,12 @@ async def run_batched_generate(
                 )
                 for feature in features
             ]
-            
+
             # Try batched generation
             try:
                 steered_result = ""
                 default_result = ""
-                
+
                 with model.hooks(fwd_hooks=editing_hooks):  # type: ignore
                     for i, result in enumerate(
                         model.generate_stream(
@@ -338,7 +347,7 @@ async def run_batched_generate(
                             custom_hf_model_id,
                         )
                         yield format_sse_message(to_return.to_json())
-            
+
             except Exception as e:
                 logger.warning(
                     f"Batch generation failed, falling back to sequential: {e}"
@@ -402,7 +411,7 @@ async def sequential_generate_chat(
     """Fallback to sequential generation if batch generation fails."""
     model = Model.get_instance()
     sae_manager = SAEManager.get_instance()
-    
+
     def steering_hook(activations: torch.Tensor, hook: Any) -> torch.Tensor:  # noqa: ARG001
         # log activation device
         # logger.info(f"Activations device: {activations.device}")
@@ -414,38 +423,38 @@ async def sequential_generate_chat(
 
                 # If we want to steer special tokens, then just pass it through without masking
                 if steer_special_tokens:
-                    mask = torch.ones(
-                        activations.shape[1], device=activations.device
-                    )
+                    mask = torch.ones(activations.shape[1], device=activations.device)
                 else:
                     # TODO: Need to generalize beyond the gemma tokenizer
 
                     # Get the current tokens for this batch
                     current_tokens = promptTokenized.to(activations.device)
 
-                    mask = torch.ones(
-                        activations.shape[1], device=activations.device
-                    )
+                    mask = torch.ones(activations.shape[1], device=activations.device)
 
                     # Find indices of special tokens
 
                     bos_indices = (
                         current_tokens == model.tokenizer.bos_token_id
                     ).nonzero(as_tuple=True)[0]  # type: ignore
-                    
+
                     # Apply masking rules
                     # 1. Don't steer <bos>
                     mask[bos_indices] = 0
-                    
+
                     # Only check for chat-specific tokens if the model supports them
-                    if hasattr(model.tokenizer, 'chat_template') and model.tokenizer.chat_template is not None:
+                    if (
+                        hasattr(model.tokenizer, "chat_template")
+                        and model.tokenizer.chat_template is not None
+                    ):
                         try:
                             start_of_turn_indices = (
                                 current_tokens
                                 == model.tokenizer.encode("<start_of_turn>")[0]
                             ).nonzero(as_tuple=True)[0]
                             end_of_turn_indices = (
-                                current_tokens == model.tokenizer.encode("<end_of_turn>")[0]
+                                current_tokens
+                                == model.tokenizer.encode("<end_of_turn>")[0]
                             ).nonzero(as_tuple=True)[0]
 
                             # 2. Don't steer <start_of_turn> and the next two tokens
@@ -465,9 +474,7 @@ async def sequential_generate_chat(
                     )
 
                     if not torch.isfinite(steering_vector).all():
-                        raise ValueError(
-                            "Steering vector contains inf or nan values"
-                        )
+                        raise ValueError("Steering vector contains inf or nan values")
 
                     if normalize_steering:
                         norm = torch.norm(steering_vector)
@@ -478,9 +485,7 @@ async def sequential_generate_chat(
                     coeff = strength_multiplier * feature.strength
 
                     if steer_method == NPSteerMethod.SIMPLE_ADDITIVE:
-                        activations[i] += (
-                            coeff * steering_vector * mask.unsqueeze(-1)
-                        )
+                        activations[i] += coeff * steering_vector * mask.unsqueeze(-1)
 
                     elif steer_method == NPSteerMethod.ORTHOGONAL_DECOMP:
                         projector = OrthogonalProjector(steering_vector)
@@ -549,43 +554,42 @@ def create_batched_steering_hook(
     steer_special_tokens: bool,
 ):
     """Create a batched steering hook that applies steering only to activations[0]."""
+
     def batched_steering_hook(activations: torch.Tensor, hook: Any) -> torch.Tensor:  # noqa: ARG001
         model = Model.get_instance()
-        
+
         if model.tokenizer is None:
             raise ValueError("Tokenizer is not initialized")
 
         # Apply steering only to the first item in batch (index 0)
         # Leave activations[1] unmodified for DEFAULT
-        
+
         # If we want to steer special tokens, then just pass it through without masking
         if steer_special_tokens:
-            mask = torch.ones(
-                activations.shape[1], device=activations.device
-            )
+            mask = torch.ones(activations.shape[1], device=activations.device)
         else:
             # Get the current tokens for this batch
             current_tokens = promptTokenized.to(activations.device)
 
-            mask = torch.ones(
-                activations.shape[1], device=activations.device
-            )
+            mask = torch.ones(activations.shape[1], device=activations.device)
 
             # Find indices of special tokens
-            bos_indices = (
-                current_tokens == model.tokenizer.bos_token_id
-            ).nonzero(as_tuple=True)[0]  # type: ignore
-            
+            bos_indices = (current_tokens == model.tokenizer.bos_token_id).nonzero(
+                as_tuple=True
+            )[0]  # type: ignore
+
             # Apply masking rules
             # 1. Don't steer <bos>
             mask[bos_indices] = 0
-            
+
             # Only check for chat-specific tokens if the model supports them
-            if hasattr(model.tokenizer, 'chat_template') and model.tokenizer.chat_template is not None:
+            if (
+                hasattr(model.tokenizer, "chat_template")
+                and model.tokenizer.chat_template is not None
+            ):
                 try:
                     start_of_turn_indices = (
-                        current_tokens
-                        == model.tokenizer.encode("<start_of_turn>")[0]
+                        current_tokens == model.tokenizer.encode("<start_of_turn>")[0]
                     ).nonzero(as_tuple=True)[0]
                     end_of_turn_indices = (
                         current_tokens == model.tokenizer.encode("<end_of_turn>")[0]
@@ -601,7 +605,7 @@ def create_batched_steering_hook(
                 except Exception:
                     # Model doesn't have these special tokens, skip
                     pass
-        
+
         # Apply steering with the mask (only to activations[0])
         for feature in features:
             steering_vector = torch.tensor(feature.steering_vector).to(
@@ -609,9 +613,7 @@ def create_batched_steering_hook(
             )
 
             if not torch.isfinite(steering_vector).all():
-                raise ValueError(
-                    "Steering vector contains inf or nan values"
-                )
+                raise ValueError("Steering vector contains inf or nan values")
 
             if normalize_steering:
                 norm = torch.norm(steering_vector)
@@ -622,9 +624,7 @@ def create_batched_steering_hook(
             coeff = strength_multiplier * feature.strength
 
             if steer_method == NPSteerMethod.SIMPLE_ADDITIVE:
-                activations[0] += (
-                    coeff * steering_vector * mask.unsqueeze(-1)
-                )
+                activations[0] += coeff * steering_vector * mask.unsqueeze(-1)
 
             elif steer_method == NPSteerMethod.ORTHOGONAL_DECOMP:
                 projector = OrthogonalProjector(steering_vector)
@@ -635,13 +635,13 @@ def create_batched_steering_hook(
 
         # Leave activations[1] unmodified for DEFAULT
         return activations
-    
+
     return batched_steering_hook
 
 
 async def generate_single_completion_chat(
     promptTokenized: torch.Tensor,
-    inputPrompt: list[NPSteerChatMessage],
+    inputPrompt: list[NPSteerChatMessage],  # noqa: ARG001
     features: list[NPSteerFeature] | list[NPSteerVector],
     steer_type: NPSteerType,
     strength_multiplier: float,
@@ -649,7 +649,7 @@ async def generate_single_completion_chat(
     steer_method: NPSteerMethod,
     normalize_steering: bool,
     steer_special_tokens: bool,
-    custom_hf_model_id: str | None = None,
+    custom_hf_model_id: str | None = None,  # noqa: ARG001
     **kwargs: Any,
 ) -> AsyncGenerator[str, None]:
     """Generate a single completion chat (steered or default)."""
@@ -666,28 +666,27 @@ async def generate_single_completion_chat(
 
             # If we want to steer special tokens, then just pass it through without masking
             if steer_special_tokens:
-                mask = torch.ones(
-                    activations.shape[1], device=activations.device
-                )
+                mask = torch.ones(activations.shape[1], device=activations.device)
             else:
                 # Get the current tokens for this batch
                 current_tokens = promptTokenized.to(activations.device)
 
-                mask = torch.ones(
-                    activations.shape[1], device=activations.device
-                )
+                mask = torch.ones(activations.shape[1], device=activations.device)
 
                 # Find indices of special tokens
-                bos_indices = (
-                    current_tokens == model.tokenizer.bos_token_id
-                ).nonzero(as_tuple=True)[0]  # type: ignore
-                
+                bos_indices = (current_tokens == model.tokenizer.bos_token_id).nonzero(
+                    as_tuple=True
+                )[0]  # type: ignore
+
                 # Apply masking rules
                 # 1. Don't steer <bos>
                 mask[bos_indices] = 0
-                
+
                 # Only check for chat-specific tokens if the model supports them
-                if hasattr(model.tokenizer, 'chat_template') and model.tokenizer.chat_template is not None:
+                if (
+                    hasattr(model.tokenizer, "chat_template")
+                    and model.tokenizer.chat_template is not None
+                ):
                     try:
                         start_of_turn_indices = (
                             current_tokens
@@ -707,7 +706,7 @@ async def generate_single_completion_chat(
                     except Exception:
                         # Model doesn't have these special tokens, skip
                         pass
-            
+
             # Apply steering with the mask
             for feature in features:
                 steering_vector = torch.tensor(feature.steering_vector).to(
@@ -715,9 +714,7 @@ async def generate_single_completion_chat(
                 )
 
                 if not torch.isfinite(steering_vector).all():
-                    raise ValueError(
-                        "Steering vector contains inf or nan values"
-                    )
+                    raise ValueError("Steering vector contains inf or nan values")
 
                 if normalize_steering:
                     norm = torch.norm(steering_vector)
@@ -728,9 +725,7 @@ async def generate_single_completion_chat(
                 coeff = strength_multiplier * feature.strength
 
                 if steer_method == NPSteerMethod.SIMPLE_ADDITIVE:
-                    activations[0] += (
-                        coeff * steering_vector * mask.unsqueeze(-1)
-                    )
+                    activations[0] += coeff * steering_vector * mask.unsqueeze(-1)
 
                 elif steer_method == NPSteerMethod.ORTHOGONAL_DECOMP:
                     projector = OrthogonalProjector(steering_vector)
