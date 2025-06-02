@@ -210,12 +210,14 @@ class TestGenerateSingleCompletionChat:
         mock_model.tokenizer.bos_token_id = 1
         mock_model.to_string.return_value = "test output"
         mock_model.reset_hooks = Mock()
-        mock_model.hooks = Mock()
-        mock_model.hooks.__enter__ = Mock(return_value=None)
-        mock_model.hooks.__exit__ = Mock(return_value=None)
+        # Create a context manager mock
+        context_manager = Mock()
+        context_manager.__enter__ = Mock(return_value=None)
+        context_manager.__exit__ = Mock(return_value=None)
+        mock_model.hooks = Mock(return_value=context_manager)
         
         # Mock generate_stream to yield results
-        async def mock_generate_stream(**kwargs):
+        def mock_generate_stream(**kwargs):
             yield [torch.tensor([1, 2, 3])]
         
         mock_model.generate_stream = mock_generate_stream
@@ -268,11 +270,13 @@ class TestGenerateSingleCompletionChat:
         mock_model.tokenizer = Mock()
         mock_model.to_string.return_value = "default output"
         mock_model.reset_hooks = Mock()
-        mock_model.hooks = Mock()
-        mock_model.hooks.__enter__ = Mock(return_value=None)
-        mock_model.hooks.__exit__ = Mock(return_value=None)
+        # Create a context manager mock
+        context_manager = Mock()
+        context_manager.__enter__ = Mock(return_value=None)
+        context_manager.__exit__ = Mock(return_value=None)
+        mock_model.hooks = Mock(return_value=context_manager)
         
-        async def mock_generate_stream(**kwargs):
+        def mock_generate_stream(**kwargs):
             yield [torch.tensor([1, 2, 3])]
         
         mock_model.generate_stream = mock_generate_stream
@@ -316,6 +320,12 @@ class TestMakeSteerCompletionChatResponse:
         mock_response_class.return_value = Mock()
         
         mock_model = Mock()
+        mock_model.to_string = Mock(return_value="mocked prompt string")
+        mock_model.tokenizer = Mock()
+        mock_model.tokenizer.encode = Mock(return_value=[1, 2, 3, 4])
+        mock_model.tokenizer.decode = Mock(return_value="decoded text")
+        mock_model.tokenizer.bos_token_id = 1
+        mock_model.tokenizer.eos_token_id = 2
         promptTokenized = torch.tensor([1, 2, 3])
         promptChat = [NPSteerChatMessage(role="user", content="test")]
         
@@ -341,6 +351,12 @@ class TestMakeSteerCompletionChatResponse:
         mock_response_class.return_value = Mock()
         
         mock_model = Mock()
+        mock_model.to_string = Mock(return_value="mocked prompt string")
+        mock_model.tokenizer = Mock()
+        mock_model.tokenizer.encode = Mock(return_value=[1, 2, 3, 4])
+        mock_model.tokenizer.decode = Mock(return_value="decoded text")
+        mock_model.tokenizer.bos_token_id = 1
+        mock_model.tokenizer.eos_token_id = 2
         promptTokenized = torch.tensor([1, 2, 3])
         promptChat = [NPSteerChatMessage(role="user", content="test")]
         
@@ -375,13 +391,15 @@ class TestSequentialGenerateChat:
         mock_model.tokenizer.chat_template = None
         mock_model.to_string.return_value = "output"
         mock_model.reset_hooks = Mock()
-        mock_model.hooks = Mock()
-        mock_model.hooks.__enter__ = Mock(return_value=None)
-        mock_model.hooks.__exit__ = Mock(return_value=None)
+        # Create a context manager mock
+        context_manager = Mock()
+        context_manager.__enter__ = Mock(return_value=None)
+        context_manager.__exit__ = Mock(return_value=None)
+        mock_model.hooks = Mock(return_value=context_manager)
         
         # Mock generate_stream to yield different results for steered vs default
         call_count = 0
-        async def mock_generate_stream(**kwargs):
+        def mock_generate_stream(**kwargs):
             nonlocal call_count
             call_count += 1
             if call_count == 1:  # STEERED call
