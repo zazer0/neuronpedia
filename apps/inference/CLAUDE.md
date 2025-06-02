@@ -58,6 +58,7 @@ make check-ci
 - Use `pytest` with fixtures defined in `conftest.py`
 - Mock external dependencies when appropriate
 - Always run `make check-ci` before committing
+- ALWAYS use the `make` commands defined in @Makefile to run/validate tests (e.g, make check-format)
 
 ## API Endpoints
 
