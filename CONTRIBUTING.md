@@ -10,7 +10,7 @@ Use [Github Issues](https://github.com/hijohnnylin/neuronpedia/issues) for the f
 - Bug Reports
   - Please include steps to reproduce the bug
 - Questions
-  - Shorter questions can be answered in our [Slack #neuronpedia](https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-2o756ku1c-_yKBeUQMVfS_p_qcK6QLeA)
+  - Shorter questions can be answered in our [Slack #neuronpedia](https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-35oqtxb2t-yKBlqTL570ycNJisIFX2gw)
   - Sensitive questions can be sent [via email](mailto:johnny@neuronpedia.org)
 
 ## Pull Requests
