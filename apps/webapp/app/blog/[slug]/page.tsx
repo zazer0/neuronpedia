@@ -80,7 +80,7 @@ export default async function Page({ params }: Props) {
             <Image src={meta.image} alt={meta.title} width={800} height={400} className="w-full rounded-md" />
             <CardTitle className="pb-0 pt-5 text-[28px] font-bold text-slate-800">{meta.title}</CardTitle>
             <div className="mb-2 text-[15px] font-medium text-slate-800">{meta.description}</div>
-            <div className="font-mono text-[12px] font-medium text-slate-600">
+            <div className="font-mono text-[12px] font-medium text-slate-400">
               By {meta.author} · {getBlogDateString(meta.date)}
             </div>
           </CardHeader>

@@ -64,8 +64,8 @@ export default async function Page() {
                       </p>
 
                       <div className="flex flex-row items-center justify-between font-mono">
-                        <p className="font-mono text-[11px] font-medium text-slate-600">{post.author}</p>
-                        <p className="text-[11px] font-medium text-slate-600">{getBlogDateString(post.date)}</p>
+                        <p className="font-mono text-[11px] font-medium text-slate-400">{post.author}</p>
+                        <p className="text-[11px] font-medium text-slate-400">{getBlogDateString(post.date)}</p>
                       </div>
                     </div>
                   </Link>
