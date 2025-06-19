@@ -20,6 +20,7 @@ X_SECRET_KEY = "cat"
 MODEL_ID = "gpt2-small"
 SAE_SOURCE_SET = "res-jb"
 SAE_SELECTED_SOURCES = ["7-res-jb"]
+ABS_TOLERANCE = 1e-6
 
 
 @pytest.fixture(scope="session")

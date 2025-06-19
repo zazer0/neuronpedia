@@ -1,5 +1,4 @@
 import pytest
-
 from fastapi.testclient import TestClient
 from neuronpedia_inference_client.models.activation_single_post200_response import (
     ActivationSinglePost200Response,
@@ -8,17 +7,16 @@ from neuronpedia_inference_client.models.activation_single_post_request import (
     ActivationSinglePostRequest,
 )
 
-
 from tests.conftest import (
+    ABS_TOLERANCE,
+    BOS_TOKEN_STR,
     MODEL_ID,
+    SAE_SELECTED_SOURCES,
     TEST_PROMPT,
     X_SECRET_KEY,
-    SAE_SELECTED_SOURCES,
-    BOS_TOKEN_STR,
 )
 
 ENDPOINT = "/v1/activation/single"
-ABS_TOLERANCE = 1e-6
 
 
 def test_activation_single_with_source_and_index(client: TestClient):
@@ -41,19 +39,25 @@ def test_activation_single_with_source_and_index(client: TestClient):
     assert response.status_code == 200
 
     # Validate the structure with Pydantic model
-    data = response.json() 
-    response_model = ActivationSinglePost200Response(**data)   
+    data = response.json()
+    response_model = ActivationSinglePost200Response(**data)
 
-    # Check activation values    
+    # Check activation values
     expected_activations = [134.71969604492188, 0.051671065390110016, 0.0, 0.0, 0.0]
     expected_max_value = 134.71969604492188
     expected_max_value_index = 0
-    assert pytest.approx(response_model.activation.values, abs=ABS_TOLERANCE) == expected_activations
-    assert response_model.activation.max_value is not None
-    assert response_model.activation.max_value_index is not None
+    assert (
+        pytest.approx(response_model.activation.values, abs=ABS_TOLERANCE)
+        == expected_activations
+    )
+    assert (
+        pytest.approx(response_model.activation.max_value, abs=ABS_TOLERANCE)
+        == expected_max_value
+    )
+    assert response_model.activation.max_value_index == expected_max_value_index
 
-    # Check tokens        
-    expected_tokens = [BOS_TOKEN_STR, 'Hello', ',', ' world', '!']    
+    # Check tokens
+    expected_tokens = [BOS_TOKEN_STR, "Hello", ",", " world", "!"]
     assert response_model.tokens == expected_tokens
 
 
@@ -82,17 +86,22 @@ def test_activation_single_with_vector_and_hook(client: TestClient):
 
     # Validate the structure with Pydantic model
     data = response.json()
-    response_model = ActivationSinglePost200Response(**data)    
+    response_model = ActivationSinglePost200Response(**data)
 
     # Check activation values
-    expected_activations = [5.4140625, 3.23828125, 1.9462890625, 1.671875]    
+    expected_activations = [5.4140625, 3.23828125, 1.9462890625, 1.671875]
     expected_max_value = 5.4140625
     expected_max_value_index = 0
- 
-    assert pytest.approx(response_model.activation.values, abs=ABS_TOLERANCE) == expected_activations
-    assert pytest.approx(response_model.activation.max_value, abs=ABS_TOLERANCE) == expected_max_value
+    assert (
+        pytest.approx(response_model.activation.values, abs=ABS_TOLERANCE)
+        == expected_activations
+    )
+    assert (
+        pytest.approx(response_model.activation.max_value, abs=ABS_TOLERANCE)
+        == expected_max_value
+    )
     assert response_model.activation.max_value_index == expected_max_value_index
 
     # Check token values
-    expected_tokens = ['Hello', ',', ' world', '!']
+    expected_tokens = ["Hello", ",", " world", "!"]
     assert response_model.tokens == expected_tokens
