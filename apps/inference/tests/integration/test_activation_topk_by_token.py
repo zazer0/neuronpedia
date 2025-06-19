@@ -82,7 +82,7 @@ def test_activation_topk_by_token_basic(client: TestClient):
     ), "Number of results doesn't match number of tokens"
 
     # Validate each token's top features
-    for i, (token, result) in enumerate(zip(expected_tokens, response_model.results)):
+    for _, (token, result) in enumerate(zip(expected_tokens, response_model.results)):
         expected_features = expected_features_by_token[token]
 
         # Check we have the right number of features
@@ -116,9 +116,9 @@ def test_activation_topk_by_token_with_bos(client: TestClient):
     )
 
     # Expected response data (including BOS token)
-    expected_tokens = ["<|endoftext|>", "Hello", ",", " world", "!"]
+    expected_tokens = [BOS_TOKEN_STR, "Hello", ",", " world", "!"]
     expected_features_by_token = {
-        "<|endoftext|>": [
+        BOS_TOKEN_STR: [
             (9663, 941.2152099609375),
             (14519, 631.7471923828125),
             (8598, 608.943603515625),
@@ -171,7 +171,7 @@ def test_activation_topk_by_token_with_bos(client: TestClient):
     ), "Number of results doesn't match number of tokens"
 
     # Validate each token's top features
-    for i, (token, result) in enumerate(zip(expected_tokens, response_model.results)):
+    for _, (token, result) in enumerate(zip(expected_tokens, response_model.results)):
         expected_features = expected_features_by_token[token]
 
         # Check we have the right number of features
