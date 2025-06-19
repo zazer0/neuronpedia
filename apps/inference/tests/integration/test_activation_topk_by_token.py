@@ -37,10 +37,26 @@ def test_activation_topk_by_token_basic(client: TestClient):
     # Expected response data
     expected_tokens = ["Hello", ",", " world", "!"]
     expected_features_by_token = {
-        "Hello": [(16653, 46.481327056884766), (13715, 43.21952438354492), (20750, 22.139848709106445)],
-        ",": [(2494, 33.579681396484375), (1457, 19.781414031982422), (15348, 14.109557151794434)],
-        " world": [(22763, 26.626646041870117), (17362, 22.529861450195312), (2494, 15.487942695617676)],
-        "!": [(13413, 25.002201080322266), (21841, 17.194128036499023), (2494, 15.784616470336914)],
+        "Hello": [
+            (16653, 46.481327056884766),
+            (13715, 43.21952438354492),
+            (20750, 22.139848709106445),
+        ],
+        ",": [
+            (2494, 33.579681396484375),
+            (1457, 19.781414031982422),
+            (15348, 14.109557151794434),
+        ],
+        " world": [
+            (22763, 26.626646041870117),
+            (17362, 22.529861450195312),
+            (2494, 15.487942695617676),
+        ],
+        "!": [
+            (13413, 25.002201080322266),
+            (21841, 17.194128036499023),
+            (2494, 15.784616470336914),
+        ],
     }
 
     # Make request
@@ -56,25 +72,34 @@ def test_activation_topk_by_token_basic(client: TestClient):
     response_model = ActivationTopkByTokenPost200Response(**data)
 
     # Validate tokens match expected
-    assert response_model.tokens == expected_tokens, "Tokens don't match expected values"
-    
+    assert (
+        response_model.tokens == expected_tokens
+    ), "Tokens don't match expected values"
+
     # Validate we have results for each token
-    assert len(response_model.results) == len(expected_tokens), "Number of results doesn't match number of tokens"
-    
+    assert len(response_model.results) == len(
+        expected_tokens
+    ), "Number of results doesn't match number of tokens"
+
     # Validate each token's top features
     for i, (token, result) in enumerate(zip(expected_tokens, response_model.results)):
         expected_features = expected_features_by_token[token]
-        
+
         # Check we have the right number of features
-        assert len(result.top_features) == TOP_K, f"Token '{token}' doesn't have {TOP_K} features"
-        
+        assert (
+            len(result.top_features) == TOP_K
+        ), f"Token '{token}' doesn't have {TOP_K} features"
+
         # Check each feature matches expected values
         for j, (expected_idx, expected_val) in enumerate(expected_features):
             actual_feature = result.top_features[j]
-            assert actual_feature.feature_index == expected_idx, \
-                f"Token '{token}' feature {j}: expected index {expected_idx}, got {actual_feature.feature_index}"
-            assert pytest.approx(actual_feature.activation_value, abs=ABS_TOLERANCE) == expected_val, \
-                f"Token '{token}' feature {j}: expected value {expected_val}, got {actual_feature.activation_value}"
+            assert (
+                actual_feature.feature_index == expected_idx
+            ), f"Token '{token}' feature {j}: expected index {expected_idx}, got {actual_feature.feature_index}"
+            assert (
+                pytest.approx(actual_feature.activation_value, abs=ABS_TOLERANCE)
+                == expected_val
+            ), f"Token '{token}' feature {j}: expected value {expected_val}, got {actual_feature.activation_value}"
 
 
 def test_activation_topk_by_token_with_bos(client: TestClient):
@@ -93,11 +118,31 @@ def test_activation_topk_by_token_with_bos(client: TestClient):
     # Expected response data (including BOS token)
     expected_tokens = ["<|endoftext|>", "Hello", ",", " world", "!"]
     expected_features_by_token = {
-        "<|endoftext|>": [(9663, 941.2152099609375), (14519, 631.7471923828125), (8598, 608.943603515625)],
-        "Hello": [(16653, 46.481327056884766), (13715, 43.21952438354492), (20750, 22.139848709106445)],
-        ",": [(2494, 33.579681396484375), (1457, 19.781414031982422), (15348, 14.109557151794434)],
-        " world": [(22763, 26.626646041870117), (17362, 22.529861450195312), (2494, 15.487942695617676)],
-        "!": [(13413, 25.002201080322266), (21841, 17.194128036499023), (2494, 15.784616470336914)],
+        "<|endoftext|>": [
+            (9663, 941.2152099609375),
+            (14519, 631.7471923828125),
+            (8598, 608.943603515625),
+        ],
+        "Hello": [
+            (16653, 46.481327056884766),
+            (13715, 43.21952438354492),
+            (20750, 22.139848709106445),
+        ],
+        ",": [
+            (2494, 33.579681396484375),
+            (1457, 19.781414031982422),
+            (15348, 14.109557151794434),
+        ],
+        " world": [
+            (22763, 26.626646041870117),
+            (17362, 22.529861450195312),
+            (2494, 15.487942695617676),
+        ],
+        "!": [
+            (13413, 25.002201080322266),
+            (21841, 17.194128036499023),
+            (2494, 15.784616470336914),
+        ],
     }
 
     # Make request
@@ -114,27 +159,36 @@ def test_activation_topk_by_token_with_bos(client: TestClient):
 
     # Verify BOS token is included at the start
     assert response_model.tokens[0] == BOS_TOKEN_STR, "BOS token not found at start"
-    
+
     # Validate tokens match expected (including BOS)
-    assert response_model.tokens == expected_tokens, "Tokens don't match expected values"
-    
+    assert (
+        response_model.tokens == expected_tokens
+    ), "Tokens don't match expected values"
+
     # Validate we have results for each token
-    assert len(response_model.results) == len(expected_tokens), "Number of results doesn't match number of tokens"
-    
+    assert len(response_model.results) == len(
+        expected_tokens
+    ), "Number of results doesn't match number of tokens"
+
     # Validate each token's top features
     for i, (token, result) in enumerate(zip(expected_tokens, response_model.results)):
         expected_features = expected_features_by_token[token]
-        
+
         # Check we have the right number of features
-        assert len(result.top_features) == TOP_K, f"Token '{token}' doesn't have {TOP_K} features"
-        
+        assert (
+            len(result.top_features) == TOP_K
+        ), f"Token '{token}' doesn't have {TOP_K} features"
+
         # Check each feature matches expected values
         for j, (expected_idx, expected_val) in enumerate(expected_features):
             actual_feature = result.top_features[j]
-            assert actual_feature.feature_index == expected_idx, \
-                f"Token '{token}' feature {j}: expected index {expected_idx}, got {actual_feature.feature_index}"
-            assert pytest.approx(actual_feature.activation_value, abs=ABS_TOLERANCE) == expected_val, \
-                f"Token '{token}' feature {j}: expected value {expected_val}, got {actual_feature.activation_value}"
+            assert (
+                actual_feature.feature_index == expected_idx
+            ), f"Token '{token}' feature {j}: expected index {expected_idx}, got {actual_feature.feature_index}"
+            assert (
+                pytest.approx(actual_feature.activation_value, abs=ABS_TOLERANCE)
+                == expected_val
+            ), f"Token '{token}' feature {j}: expected value {expected_val}, got {actual_feature.activation_value}"
 
 
 def test_activation_topk_by_token_invalid_source(client: TestClient):
@@ -183,7 +237,7 @@ def test_activation_topk_by_token_long_prompt(client: TestClient):
     )
 
     assert response.status_code == 400
-    data = response.json()        
-    
+    data = response.json()
+
     expected_error_message = "Text too long: 6002 tokens, max is 500"
-    assert data["error"] == expected_error_message 
+    assert data["error"] == expected_error_message
