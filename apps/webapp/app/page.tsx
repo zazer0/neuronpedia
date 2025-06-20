@@ -15,7 +15,6 @@ import {
 import { getSourceSetNameFromSource } from '@/lib/utils/source';
 import { QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import {
-  BadgeDollarSign,
   Blocks,
   BookOpenText,
   Computer,
@@ -574,7 +573,7 @@ export default function Page() {
                 Johnny Lin
               </a>
               , an ex-Apple engineer who previously founded a privacy startup. Neuronpedia is supported by Decode
-              Research, the Long Term Future Fund, and AISTOF.
+              Research, the Long Term Future Fund, AISTOF, Anthropic, and others.
             </div>
           </div>
 
@@ -589,7 +588,13 @@ export default function Page() {
               >
                 <Button className="h-14 w-[170px] gap-x-2 sm:w-[200px]" size="lg">
                   <Slack className="h-5 w-5" />
-                  <span className="flex-1">Slack</span>
+                  <span className="flex-1">Community</span>
+                </Button>
+              </a>
+              <a href="https://github.com/hijohnny/neuronpedia" target="_blank" rel="noreferrer">
+                <Button className="h-14 w-[170px] gap-x-2 sm:w-[200px]" size="lg">
+                  <Github className="h-5 w-5" />
+                  <span className="flex-1">GitHub</span>
                 </Button>
               </a>
               <a href="/contact" target="_blank" rel="noreferrer">
@@ -602,12 +607,6 @@ export default function Page() {
                 <Button className="h-14 w-[170px] gap-x-2 sm:w-[200px]" size="lg">
                   <School className="h-5 w-5" />
                   <span className="flex-1">Upskill</span>
-                </Button>
-              </a>
-              <a href="https://www.every.org/decode-research" target="_blank" rel="noreferrer">
-                <Button className="h-14 w-[170px] gap-x-2 sm:w-[200px]" size="lg">
-                  <BadgeDollarSign className="h-5 w-5" />
-                  <span className="flex-1">Donate</span>
                 </Button>
               </a>
             </div>
