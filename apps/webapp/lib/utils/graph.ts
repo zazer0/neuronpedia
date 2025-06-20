@@ -1,11 +1,20 @@
-import { GRAPH_SERVER, GRAPH_SERVER_SECRET, USE_LOCALHOST_GRAPH } from '@/lib/env';
+import {
+  GRAPH_RUNPOD_SECRET,
+  GRAPH_RUNPOD_SERVER,
+  GRAPH_SERVER,
+  GRAPH_SERVER_SECRET,
+  USE_LOCALHOST_GRAPH,
+} from '@/lib/env';
 import * as yup from 'yup';
+
+export const MAX_RUNPOD_JOBS_IN_QUEUE = 1000;
+export const RUNPOD_BUSY_ERROR = 'RUNPOD_BUSY';
 
 export const GRAPH_MAX_PROMPT_LENGTH_CHARS = 10000;
 export const GRAPH_BATCH_SIZE = 48;
-// this time estimate comes from testing different prompt lengths with batch size 48, and is only valid for gemma-2-2b
-export const getEstimatedTimeFromNumTokens = (numTokens: number) => 0.7123 * numTokens + 6.3265 + 8;
-export const GRAPH_MAX_TOKENS = 32;
+// this time estimate comes from testing different prompt lengths with batch size 48, and is only valid for gemma-2-2b, for a40
+export const getEstimatedTimeFromNumTokens = (numTokens: number) => 11.2 * Math.log2(Math.max(numTokens, 4)) - 7; // add a few seconds buffer
+export const GRAPH_MAX_TOKENS = 64;
 export const GRAPH_GENERATION_ENABLED_MODELS = ['gemma-2-2b'];
 export const GRAPH_MODEL_MAP = { 'gemma-2-2b': 'google/gemma-2-2b' };
 
@@ -18,12 +27,21 @@ export const GRAPH_DESIREDLOGITPROB_MIN = 0.6;
 export const GRAPH_DESIREDLOGITPROB_MAX = 0.99;
 export const GRAPH_DESIREDLOGITPROB_DEFAULT = 0.95;
 export const GRAPH_NODETHRESHOLD_MIN = 0.5;
-export const GRAPH_NODETHRESHOLD_MAX = 0.99;
+export const GRAPH_NODETHRESHOLD_MAX = 1.0;
 export const GRAPH_NODETHRESHOLD_DEFAULT = 0.8;
 export const GRAPH_EDGETHRESHOLD_MIN = 0.8;
-export const GRAPH_EDGETHRESHOLD_MAX = 0.99;
-export const GRAPH_EDGETHRESHOLD_DEFAULT = 0.98;
+export const GRAPH_EDGETHRESHOLD_MAX = 1.0;
+export const GRAPH_EDGETHRESHOLD_DEFAULT = 0.85;
+export const GRAPH_MAXFEATURENODES_MIN = 3000;
+export const GRAPH_MAXFEATURENODES_MAX = 10000;
+export const GRAPH_MAXFEATURENODES_DEFAULT = 5000;
 export const GRAPH_SLUG_MIN = 2;
+
+export const GRAPH_DYNAMIC_PRUNING_THRESHOLD_DEFAULT = 0.6;
+
+export const GRAPH_ANONYMOUS_USER_ID = 'anonymous';
+
+export const MAX_PUT_REQUESTS_PER_DAY = 200;
 
 export const graphGenerateSchemaClient = yup.object({
   prompt: yup
@@ -37,21 +55,32 @@ export const graphGenerateSchemaClient = yup.object({
     .integer('Must be an integer.')
     .min(GRAPH_MAXNLOGITS_MIN, `Must be at least ${GRAPH_MAXNLOGITS_MIN}.`)
     .max(GRAPH_MAXNLOGITS_MAX, `Must be at most ${GRAPH_MAXNLOGITS_MAX}.`)
+    .default(GRAPH_MAXNLOGITS_DEFAULT)
     .required('This field is required.'),
   desiredLogitProb: yup
     .number()
     .min(GRAPH_DESIREDLOGITPROB_MIN, `Must be at least ${GRAPH_DESIREDLOGITPROB_MIN}.`)
     .max(GRAPH_DESIREDLOGITPROB_MAX, `Must be at most ${GRAPH_DESIREDLOGITPROB_MAX}.`)
+    .default(GRAPH_DESIREDLOGITPROB_DEFAULT)
     .required('This field is required.'),
   nodeThreshold: yup
     .number()
     .min(GRAPH_NODETHRESHOLD_MIN, `Must be at least ${GRAPH_NODETHRESHOLD_MIN}.`)
     .max(GRAPH_NODETHRESHOLD_MAX, `Must be at most ${GRAPH_NODETHRESHOLD_MAX}.`)
+    .default(GRAPH_NODETHRESHOLD_DEFAULT)
     .required('This field is required.'),
   edgeThreshold: yup
     .number()
     .min(GRAPH_EDGETHRESHOLD_MIN, `Must be at least ${GRAPH_EDGETHRESHOLD_MIN}.`)
     .max(GRAPH_EDGETHRESHOLD_MAX, `Must be at most ${GRAPH_EDGETHRESHOLD_MAX}.`)
+    .default(GRAPH_EDGETHRESHOLD_DEFAULT)
+    .required('This field is required.'),
+  maxFeatureNodes: yup
+    .number()
+    .integer('Must be an integer.')
+    .min(GRAPH_MAXFEATURENODES_MIN, `Must be at least ${GRAPH_MAXFEATURENODES_MIN}.`)
+    .max(GRAPH_MAXFEATURENODES_MAX, `Must be at most ${GRAPH_MAXFEATURENODES_MAX}.`)
+    .default(GRAPH_MAXFEATURENODES_DEFAULT)
     .required('This field is required.'),
   slug: yup
     .string()
@@ -68,6 +97,7 @@ export const generateGraph = async (
   nodeThreshold: number,
   edgeThreshold: number,
   slugIdentifier: string,
+  maxFeatureNodes: number,
 ) => {
   const response = await fetch(`${USE_LOCALHOST_GRAPH ? 'http://localhost:5004' : GRAPH_SERVER}/generate-graph`, {
     method: 'POST',
@@ -85,6 +115,7 @@ export const generateGraph = async (
       node_threshold: nodeThreshold,
       edge_threshold: edgeThreshold,
       slug_identifier: slugIdentifier,
+      max_feature_nodes: maxFeatureNodes,
     }),
   });
 
@@ -92,4 +123,131 @@ export const generateGraph = async (
     throw new Error(`External API returned ${response.status}: ${response.statusText}`);
   }
   return response.json();
+};
+
+export const checkRunpodQueueJobs = async () => {
+  const response = await fetch(`${GRAPH_RUNPOD_SERVER}/health`, {
+    headers: {
+      Authorization: `Bearer ${GRAPH_RUNPOD_SECRET}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`RunPod health check failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  if (data.jobs !== undefined && data.jobs.inQueue !== undefined) {
+    return data.jobs.inQueue;
+  }
+  throw new Error('RunPod health check failed: jobs not found');
+};
+
+export type SalientLogit = { token: string; token_id: number; probability: number };
+
+export type GraphTokenizeResponse = {
+  prompt: string;
+  input_tokens: string[];
+  salient_logits: SalientLogit[];
+  total_salient_tokens: number;
+  cumulative_probability: number;
+};
+
+export interface GraphGenerateRunpodResponse {
+  error?: string;
+  output: GraphTokenizeResponse;
+}
+
+export const getGraphTokenize = async (
+  prompt: string,
+  maxNLogits: number,
+  desiredLogitProb: number,
+): Promise<GraphTokenizeResponse> => {
+  const response = await fetch(`${GRAPH_RUNPOD_SERVER}/runsync`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${GRAPH_RUNPOD_SECRET}`,
+    },
+    body: JSON.stringify({
+      input: {
+        prompt,
+        max_n_logits: maxNLogits,
+        desired_logit_prob: desiredLogitProb,
+        request_type: 'forward_pass',
+      },
+    }),
+  });
+
+  const json = await response.json();
+  if (json.error) {
+    throw new Error(json.error);
+  }
+  if (!response.ok) {
+    throw new Error(`External API returned ${response.status}: ${response.statusText}`);
+  }
+
+  const salientLogits: SalientLogit[] = json.output.salient_logits.map((logit: SalientLogit) => ({
+    token: logit.token,
+    token_id: logit.token_id,
+    probability: logit.probability,
+  }));
+
+  const toReturn: GraphTokenizeResponse = {
+    prompt,
+    input_tokens: json.output.input_tokens,
+    salient_logits: salientLogits,
+    total_salient_tokens: json.output.total_salient_tokens,
+    cumulative_probability: json.output.cumulative_probability,
+  };
+
+  return toReturn;
+};
+
+export const generateGraphAndUploadToS3 = async (
+  prompt: string,
+  modelId: string,
+  maxNLogits: number,
+  desiredLogitProb: number,
+  nodeThreshold: number,
+  edgeThreshold: number,
+  slugIdentifier: string,
+  maxFeatureNodes: number,
+  signedUrl: string,
+  userId: string | undefined,
+) => {
+  const response = await fetch(`${GRAPH_RUNPOD_SERVER}/runsync`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${GRAPH_RUNPOD_SECRET}`,
+    },
+    body: JSON.stringify({
+      input: {
+        prompt,
+        model_id: GRAPH_MODEL_MAP[modelId as keyof typeof GRAPH_MODEL_MAP],
+        batch_size: GRAPH_BATCH_SIZE,
+        max_n_logits: maxNLogits,
+        desired_logit_prob: desiredLogitProb,
+        node_threshold: nodeThreshold,
+        edge_threshold: edgeThreshold,
+        slug_identifier: slugIdentifier,
+        max_feature_nodes: maxFeatureNodes,
+        signed_url: signedUrl,
+        user_id: userId,
+      },
+    }),
+  });
+
+  const json = await response.json();
+  console.log('server json from runpod', json);
+  if (json.error) {
+    throw new Error(json.error);
+  }
+
+  if (!response.ok) {
+    throw new Error(`External API returned ${response.status}: ${response.statusText}`);
+  }
+  return json;
 };
