@@ -5,6 +5,7 @@ import {
   NP_GRAPH_BUCKET,
 } from '@/app/[modelId]/graph/utils';
 import { prisma } from '@/lib/db';
+import { USE_RUNPOD_GRAPH } from '@/lib/env';
 import {
   checkRunpodQueueJobs,
   generateGraphAndUploadToS3,
@@ -243,16 +244,18 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     });
 
     // check the queue
-    const queueNumber = await checkRunpodQueueJobs();
-    if (queueNumber > MAX_RUNPOD_JOBS_IN_QUEUE) {
-      // console.log('larger than queue but continuing');
-      return NextResponse.json(
-        {
-          error: RUNPOD_BUSY_ERROR,
-          message: RUNPOD_BUSY_ERROR,
-        },
-        { status: 503 },
-      );
+    if (USE_RUNPOD_GRAPH) {
+      const queueNumber = await checkRunpodQueueJobs();
+      if (queueNumber > MAX_RUNPOD_JOBS_IN_QUEUE) {
+        // console.log('larger than queue but continuing');
+        return NextResponse.json(
+          {
+            error: RUNPOD_BUSY_ERROR,
+            message: RUNPOD_BUSY_ERROR,
+          },
+          { status: 503 },
+        );
+      }
     }
 
     await generateGraphAndUploadToS3(
@@ -305,63 +308,6 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       );
     }
     console.log('valid graph');
-
-    // // data is valid - parse it as as json string to CLTGraph and add our metadata to it
-    // const graph = data as CLTGraph;
-    // // if graph.metadata doesnt have a nodeThreshold, set it to GRAPH_DYNAMIC_PRUNING_THRESHOLD_DEFAULT
-    // if (graph.metadata.node_threshold === undefined || graph.metadata.node_threshold === null) {
-    //   graph.metadata.node_threshold = GRAPH_DYNAMIC_PRUNING_THRESHOLD_DEFAULT;
-    // }
-    // graph.metadata = {
-    //   ...graph.metadata,
-    //   info: {
-    //     creator_name: `${request.user?.name || 'Anonymous'} (CT)`,
-    //     creator_url: 'https://neuronpedia.org',
-    //     // TODO: other sources when they become available
-    //     source_urls: SCAN_TO_SOURCE_URLS[data.metadata.scan as keyof typeof SCAN_TO_SOURCE_URLS] || [],
-    //     generator: {
-    //       name: 'circuit-tracer by Hanna & Piotrowski',
-    //       version: '0.1.0 | 1ed3f19',
-    //       url: 'https://github.com/safety-research/circuit-tracer',
-    //     },
-    //     create_time_ms: Date.now(),
-    //   },
-    //   generation_settings: {
-    //     max_n_logits: validatedData.maxNLogits,
-    //     desired_logit_prob: validatedData.desiredLogitProb,
-    //     batch_size: GRAPH_BATCH_SIZE,
-    //     max_feature_nodes: validatedData.maxFeatureNodes,
-    //   },
-    //   pruning_settings: {
-    //     node_threshold: validatedData.nodeThreshold,
-    //     edge_threshold: validatedData.edgeThreshold,
-    //   },
-    // };
-
-    // // once we have the data, upload it to S3
-    // const key = `${GRAPH_S3_USER_GRAPHS_DIR}/${request.user?.id || GRAPH_ANONYMOUS_USER_ID}/${validatedData.slug}.json`;
-
-    // const s3Client = new S3Client({
-    //   region: process.env.AWS_REGION || 'us-east-1',
-    //   credentials: {
-    //     accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    //     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-    //   },
-    // });
-
-    // const command = new PutObjectCommand({
-    //   Bucket: NP_GRAPH_BUCKET,
-    //   Key: key,
-    //   ContentType: 'application/json',
-    //   ContentLength: Buffer.byteLength(JSON.stringify(data)),
-    //   Body: JSON.stringify(data),
-    // });
-
-    // await s3Client.send(command);
-
-    // const cleanUrl = `https://${NP_GRAPH_BUCKET}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${key}`;
-
-    // console.log('S3 file upload complete');
 
     // save it to the database
     await prisma.graphMetadata.upsert({

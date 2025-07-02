@@ -4,6 +4,7 @@ import {
   GRAPH_SERVER,
   GRAPH_SERVER_SECRET,
   USE_LOCALHOST_GRAPH,
+  USE_RUNPOD_GRAPH,
 } from '@/lib/env';
 import * as yup from 'yup';
 
@@ -164,23 +165,36 @@ export const getGraphTokenize = async (
   maxNLogits: number,
   desiredLogitProb: number,
 ): Promise<GraphTokenizeResponse> => {
-  const response = await fetch(`${GRAPH_RUNPOD_SERVER}/runsync`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${GRAPH_RUNPOD_SECRET}`,
-    },
-    body: JSON.stringify({
-      input: {
-        prompt,
-        max_n_logits: maxNLogits,
-        desired_logit_prob: desiredLogitProb,
-        request_type: 'forward_pass',
+  let response;
+  const body = {
+    prompt,
+    max_n_logits: maxNLogits,
+    desired_logit_prob: desiredLogitProb,
+    request_type: 'forward_pass',
+  };
+  if (USE_RUNPOD_GRAPH) {
+    response = await fetch(`${GRAPH_RUNPOD_SERVER}/runsync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${GRAPH_RUNPOD_SECRET}`,
       },
-    }),
-  });
+      body: JSON.stringify({
+        input: body,
+      }),
+    });
+  } else {
+    response = await fetch(`${USE_LOCALHOST_GRAPH ? 'http://127.0.0.1:5004' : GRAPH_SERVER}/forward-pass`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-secret-key': GRAPH_SERVER_SECRET,
+      },
+      body: JSON.stringify(body),
+    });
+  }
 
-  const json = await response.json();
+  let json = await response.json();
   if (json.error) {
     throw new Error(json.error);
   }
@@ -188,7 +202,11 @@ export const getGraphTokenize = async (
     throw new Error(`External API returned ${response.status}: ${response.statusText}`);
   }
 
-  const salientLogits: SalientLogit[] = json.output.salient_logits.map((logit: SalientLogit) => ({
+  if (USE_RUNPOD_GRAPH) {
+    json = json.output;
+  }
+
+  const salientLogits: SalientLogit[] = json.salient_logits.map((logit: SalientLogit) => ({
     token: logit.token,
     token_id: logit.token_id,
     probability: logit.probability,
@@ -196,10 +214,10 @@ export const getGraphTokenize = async (
 
   const toReturn: GraphTokenizeResponse = {
     prompt,
-    input_tokens: json.output.input_tokens,
+    input_tokens: json.input_tokens,
     salient_logits: salientLogits,
-    total_salient_tokens: json.output.total_salient_tokens,
-    cumulative_probability: json.output.cumulative_probability,
+    total_salient_tokens: json.total_salient_tokens,
+    cumulative_probability: json.cumulative_probability,
   };
 
   return toReturn;
@@ -217,29 +235,41 @@ export const generateGraphAndUploadToS3 = async (
   signedUrl: string,
   userId: string | undefined,
 ) => {
-  const response = await fetch(`${GRAPH_RUNPOD_SERVER}/runsync`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${GRAPH_RUNPOD_SECRET}`,
-    },
-    body: JSON.stringify({
-      input: {
-        prompt,
-        model_id: GRAPH_MODEL_MAP[modelId as keyof typeof GRAPH_MODEL_MAP],
-        batch_size: GRAPH_BATCH_SIZE,
-        max_n_logits: maxNLogits,
-        desired_logit_prob: desiredLogitProb,
-        node_threshold: nodeThreshold,
-        edge_threshold: edgeThreshold,
-        slug_identifier: slugIdentifier,
-        max_feature_nodes: maxFeatureNodes,
-        signed_url: signedUrl,
-        user_id: userId,
+  let response;
+  const body = {
+    prompt,
+    model_id: GRAPH_MODEL_MAP[modelId as keyof typeof GRAPH_MODEL_MAP],
+    batch_size: GRAPH_BATCH_SIZE,
+    max_n_logits: maxNLogits,
+    desired_logit_prob: desiredLogitProb,
+    node_threshold: nodeThreshold,
+    edge_threshold: edgeThreshold,
+    slug_identifier: slugIdentifier,
+    max_feature_nodes: maxFeatureNodes,
+    signed_url: signedUrl,
+    user_id: userId,
+  };
+  if (USE_RUNPOD_GRAPH) {
+    response = await fetch(`${GRAPH_RUNPOD_SERVER}/runsync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${GRAPH_RUNPOD_SECRET}`,
       },
-    }),
-  });
-
+      body: JSON.stringify({
+        input: body,
+      }),
+    });
+  } else {
+    response = await fetch(`${USE_LOCALHOST_GRAPH ? 'http://127.0.0.1:5004' : GRAPH_SERVER}/generate-graph`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-secret-key': GRAPH_SERVER_SECRET,
+      },
+      body: JSON.stringify(body),
+    });
+  }
   const json = await response.json();
   console.log('server json from runpod', json);
   if (json.error) {
