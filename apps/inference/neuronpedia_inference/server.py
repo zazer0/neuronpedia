@@ -247,9 +247,9 @@ async def check_model(
         try:
             body = await request.json()
             if "model" in body and (
-                body["model"] != config.MODEL_ID
-                and body["model"] != config.OVERRIDE_MODEL_ID
-                and body["model"] != config.CUSTOM_HF_MODEL_ID
+                body["model"] != config.model_id
+                and body["model"] != config.override_model_id
+                and body["model"] != config.custom_hf_model_id
             ):
                 logger.error("Unsupported model: %s", body["model"])
                 return JSONResponse(
