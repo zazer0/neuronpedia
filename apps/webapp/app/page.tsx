@@ -117,19 +117,46 @@ export default function Page() {
           </Link>
         </div>
         <div className="mb-2 mt-2 flex flex-col items-center justify-center gap-x-2.5 gap-y-2 sm:flex-row">
-          <Link href="https://github.com/safety-research/circuit-tracer" target="_blank" rel="noreferrer">
-            <Button
-              variant="default"
-              size="lg"
-              className="flex w-[165px] max-w-[165px] flex-row gap-x-2 bg-slate-800 text-white transition-all hover:scale-105 hover:bg-slate-900"
-            >
-              <Github className="h-5 w-5" />
-              <div className="flex flex-col gap-y-0.5">
-                <span className="text-[12px] leading-none">GitHub</span>
-                <div className="font-mono text-[8px] font-bold leading-none">CIRCUIT-TRACER</div>
-              </div>
-            </Button>
-          </Link>
+          <CustomTooltip
+            trigger={
+              <Button
+                variant="default"
+                size="lg"
+                className="flex w-[165px] max-w-[165px] flex-row gap-x-2 bg-slate-800 text-white transition-all hover:bg-slate-200 hover:text-slate-800"
+              >
+                <Github className="h-5 w-5" />
+                <div className="flex flex-col gap-y-0.5">
+                  <span className="text-sm leading-none">GitHub</span>
+                </div>
+              </Button>
+            }
+          >
+            <div className="flex w-full flex-col gap-y-2 sm:flex-row sm:gap-x-2">
+              <Link href="https://github.com/safety-research/circuit-tracer" target="_blank" rel="noreferrer">
+                <Button
+                  variant="default"
+                  size="lg"
+                  className="flex w-[130px] max-w-[130px] flex-row gap-x-2 bg-slate-800 px-0 text-white transition-all hover:scale-105 hover:bg-slate-900"
+                >
+                  <div className="flex flex-col gap-y-0.5">
+                    <div className="font-mono text-[10px] font-bold leading-none">CIRCUIT-TRACER</div>
+                  </div>
+                </Button>
+              </Link>
+              <Link href="https://github.com/hijohnnylin/neuronpedia" target="_blank" rel="noreferrer">
+                <Button
+                  variant="default"
+                  size="lg"
+                  className="flex w-[130px] max-w-[130px] flex-row gap-x-2 bg-slate-800 px-0 text-white transition-all hover:scale-105 hover:bg-slate-900"
+                >
+                  <div className="flex flex-col gap-y-0.5">
+                    <div className="font-mono text-[10px] font-bold leading-none">NEURONPEDIA</div>
+                  </div>
+                </Button>
+              </Link>
+            </div>
+          </CustomTooltip>
+
           <Link href="/blog/circuit-tracer" target="_blank" rel="noreferrer">
             <Button
               variant="default"
@@ -230,8 +257,7 @@ export default function Page() {
             >
               <Github className="h-5 w-5" />
               <div className="flex flex-col gap-y-0.5">
-                <span className="text-[12px] leading-none">GitHub</span>
-                <div className="font-mono text-[8px] font-bold leading-none">NEURONPEDIA</div>
+                <span className="text-sm leading-none">GitHub</span>
               </div>
             </Button>
           </Link>
