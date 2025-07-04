@@ -617,7 +617,7 @@ export default function Page() {
                   <span className="flex-1">Community</span>
                 </Button>
               </a>
-              <a href="https://github.com/hijohnny/neuronpedia" target="_blank" rel="noreferrer">
+              <a href="https://github.com/hijohnnylin/neuronpedia" target="_blank" rel="noreferrer">
                 <Button className="h-14 w-[170px] gap-x-2 sm:w-[200px]" size="lg">
                   <Github className="h-5 w-5" />
                   <span className="flex-1">GitHub</span>
