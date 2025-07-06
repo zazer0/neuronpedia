@@ -17,7 +17,7 @@ import {
 import * as Checkbox from '@radix-ui/react-checkbox';
 import * as Slider from '@radix-ui/react-slider';
 import { Check, Joystick, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import * as yup from 'yup';
 import {
   ANT_MODEL_ID_TO_NEURONPEDIA_MODEL_ID,
@@ -287,9 +287,22 @@ export default function SteerModal() {
   const [randomSeed, setRandomSeed] = useState(true);
   const [freezeAttention, setFreezeAttention] = useState(false);
 
+  useEffect(() => {
+    // reset everything when selected graph changes
+    setSteerResult(undefined);
+    setIsSteering(false);
+    setSteerLogitFeatures([]);
+    setSteerTokens(10);
+    setTemperature(0.7);
+    setFreqPenalty(0);
+    setSeed(STEER_SEED);
+    setRandomSeed(true);
+    setFreezeAttention(false);
+  }, [selectedGraph]);
+
   return (
     <Dialog open={isSteerModalOpen} onOpenChange={setIsSteerModalOpen}>
-      <DialogContent className="h-[90vh] max-h-[90vh] min-h-[90vh] w-full max-w-[92vw] overflow-hidden bg-slate-50 pt-4">
+      <DialogContent className="flex h-[90vh] max-h-[90vh] min-h-[90vh] w-full max-w-[92vw] flex-col overflow-hidden bg-slate-50 pt-4">
         <DialogHeader className="flex w-full flex-col items-center justify-center">
           <DialogTitle className="flex w-full flex-row items-center justify-center text-base text-slate-700">
             <Joystick className="mr-1.5 h-5 w-5" /> Steer/Intervention Mode (Beta)
@@ -302,7 +315,7 @@ export default function SteerModal() {
           {selectedGraph ? (
             <div className="flex h-full max-h-full w-full flex-row gap-x-4 gap-y-1">
               <div className="flex h-full max-h-full basis-1/2 flex-col gap-y-1 px-0.5 pb-0.5 text-xs">
-                <Card className="flex max-h-full w-full flex-col bg-white">
+                <Card className="flex h-full max-h-full w-full flex-col bg-white">
                   <CardHeader className="sticky top-0 z-10 flex w-full flex-row items-center justify-between rounded-t-xl bg-white pb-3 pt-4">
                     <CardTitle>Features to Steer</CardTitle>
                     <Button
@@ -512,6 +525,10 @@ export default function SteerModal() {
                       variant="emerald"
                       className="mt-5 flex w-36 flex-row gap-x-1.5 self-center text-xs font-bold uppercase"
                       onClick={() => {
+                        if (steerLogitFeatures.length === 0) {
+                          alert('Please set at least one feature to steer on the left.');
+                          return;
+                        }
                         setIsSteering(true);
                         setSteerResult(undefined);
                         // TODO: remove <bos> hack
