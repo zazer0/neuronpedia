@@ -18,6 +18,9 @@ export const STEER_FREQUENCY_PENALTY = 1.0;
 export const STEER_MAX_PROMPT_CHARS = 2048;
 export const STEER_SEED = 16;
 export const STEER_METHOD = NPSteerMethod.SimpleAdditive;
+export const STEER_TOPK_LOGITS = 5;
+export const STEER_TOPK_LOGITS_MAX = 10;
+export const STEER_FREEZE_ATTENTION = false;
 
 export function replaceSteerModelIdIfNeeded(modelId: string) {
   if (STEER_FORCE_ALLOW_INSTRUCT_MODELS.includes(modelId)) {

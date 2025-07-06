@@ -7,7 +7,7 @@ import { Button } from '@/components/shadcn/button';
 import { Card, CardContent } from '@/components/shadcn/card';
 import { useScreenSize } from '@/lib/hooks/use-screen-size';
 import { QuestionMarkCircledIcon } from '@radix-ui/react-icons';
-import { Circle, FolderOpen, PinIcon, PinOffIcon, Save, Share2, TrashIcon } from 'lucide-react';
+import { Circle, FolderOpen, Joystick, PinIcon, PinOffIcon, Save, Share2, TrashIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import d3 from './d3-jetpack';
 import { clientCheckIsEmbed, CLTGraphLink, CLTGraphNode, hideTooltip, showTooltip } from './utils';
@@ -97,8 +97,13 @@ export default function Subgraph() {
     registerClickedCallback,
   } = useGraphStateContext();
 
-  const { setIsCopyModalOpen, setIsSaveSubgraphModalOpen, setIsLoadSubgraphModalOpen, openWelcomeModalToStep } =
-    useGraphModalContext();
+  const {
+    setIsCopyModalOpen,
+    setIsSaveSubgraphModalOpen,
+    setIsLoadSubgraphModalOpen,
+    openWelcomeModalToStep,
+    setIsSteerModalOpen,
+  } = useGraphModalContext();
 
   const simulationRef = useRef<d3.Simulation<ForceNode, undefined> | null>(null);
   const nodeSelRef = useRef<d3.Selection<HTMLDivElement, ForceNode, HTMLDivElement, unknown> | null>(null);
@@ -1325,6 +1330,21 @@ export default function Subgraph() {
                 <div className="h-[7px] w-[7px] rounded-full border-[1.5px] border-slate-700 bg-white" />
               </div>
               Grouping Mode
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setIsSteerModalOpen(true);
+              }}
+              className={`h-11 w-[86px] flex-col items-center justify-center gap-y-[4px] whitespace-nowrap border border-emerald-600 bg-emerald-100 px-0 text-[9.5px] font-semibold leading-none text-emerald-700 shadow transition-all hover:bg-emerald-200 hover:text-emerald-700 ${
+                visState.subgraph?.activeGrouping.isActive ? 'hidden' : 'hidden sm:flex'
+              }`}
+              disabled={visState.pinnedIds.length === 0}
+              aria-label="Steer"
+            >
+              <Joystick className="h-3.5 w-3.5" />
+              Steer (Beta)
             </Button>
           </div>
 

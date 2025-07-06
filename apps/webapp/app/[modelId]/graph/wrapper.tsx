@@ -11,6 +11,7 @@ import LinkGraph from './link-graph';
 import CopyModal from './modals/copy-modal';
 import LoadSubgraphModal from './modals/load-subgraph-modal';
 import SaveSubgraphModal from './modals/save-subgraph-modal';
+import SteerModal from './modals/steer-modal';
 import WelcomeModal from './modals/welcome-modal';
 import GraphNodeConnections from './node-connections';
 import Subgraph from './subgraph';
@@ -25,55 +26,6 @@ export default function GraphWrapper({ hasSlug }: { hasSlug: boolean }) {
       <div
         className={`${isEmbed ? 'h-[calc(100%_-_20px)] max-h-screen min-h-[calc(100%_-_20px)]' : 'h-[calc(100vh_-_75px)] max-h-[calc(100vh_-_75px)] min-h-[calc(100vh_-_75px)]'} flex w-full flex-col justify-center px-1 text-slate-700 sm:px-4`}
       >
-        {/* <div className="flex w-full flex-col items-center justify-center sm:hidden">
-          <div className="mb-2 w-full pt-8 text-center text-sm text-sky-700">
-            <span className="text-4xl">⚠️</span>
-            <br />
-            <br />
-            Sorry, attribution graphs have too many intricate visual components to fit on a mobile screen!
-            <br />
-            <br />
-            Please visit this link on a laptop or desktop, or check out these other links:
-            <br />
-            <br />
-            <a
-              href="https://github.com/safety-research/circuit-tracer"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sky-600 underline"
-            >
-              Circuit Tracer GitHub Repository
-            </a>
-            <br />
-            <a
-              href="https://transformer-circuits.pub/2025/attribution-graphs/methods.html"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sky-600 underline"
-            >
-              Attribution Graphs: Methods
-            </a>
-            <br />
-            <a
-              href="https://transformer-circuits.pub/2025/attribution-graphs/biology.html"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sky-600 underline"
-            >
-              Attribution Graphs: Biology
-            </a>
-            <br />
-            <a
-              href="https://neuronpedia.org"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sky-600 underline"
-            >
-              Back to Neuronpedia
-            </a>
-          </div>
-        </div> */}
-
         <div className="flex w-full flex-1 flex-col items-center justify-center overflow-hidden">
           {/* <div>{JSON.stringify(visState)}</div> */}
           <div className="flex w-full flex-col">
@@ -115,6 +67,7 @@ export default function GraphWrapper({ hasSlug }: { hasSlug: boolean }) {
         <WelcomeModal hasSlug={hasSlug} />
         <GenerateGraphModal />
         <CopyModal />
+        <SteerModal />
       </div>
     </GraphModalProvider>
   );
