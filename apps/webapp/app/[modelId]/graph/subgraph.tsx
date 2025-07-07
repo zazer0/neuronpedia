@@ -1092,7 +1092,10 @@ export default function Subgraph() {
 
     function handleKeyDown(ev: KeyboardEvent) {
       if (ev.repeat) return;
-      if (!visState.isEditMode || ev.key !== 'g') return;
+      // if temp-edit is active, don't allow grouping mode
+      // look for any input with class temp-edit
+      const tempEdit = document.querySelector('input.temp-edit');
+      if (!visState.isEditMode || ev.key !== 'g' || isEditingLabel || tempEdit) return;
 
       if (visState.subgraph) {
         setGroupingModeActive(true);
@@ -1100,7 +1103,8 @@ export default function Subgraph() {
     }
 
     function handleKeyUp(ev: KeyboardEvent) {
-      if (!visState.isEditMode || ev.key !== 'g') return;
+      const tempEdit = document.querySelector('input.temp-edit');
+      if (!visState.isEditMode || ev.key !== 'g' || isEditingLabel || tempEdit) return;
       if (!visState.subgraph) return;
 
       if (visState.subgraph.activeGrouping.selectedNodeIds.size > 1) {
