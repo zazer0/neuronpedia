@@ -1095,7 +1095,8 @@ export default function Subgraph() {
       // if temp-edit is active, don't allow grouping mode
       // look for any input with class temp-edit
       const tempEdit = document.querySelector('input.temp-edit');
-      if (!visState.isEditMode || ev.key !== 'g' || isEditingLabel || tempEdit) return;
+      const tempEditFeatDetail = document.querySelector('input.temp-edit-feat-detail');
+      if (!visState.isEditMode || ev.key !== 'g' || tempEdit || tempEditFeatDetail) return;
 
       if (visState.subgraph) {
         setGroupingModeActive(true);
@@ -1104,7 +1105,8 @@ export default function Subgraph() {
 
     function handleKeyUp(ev: KeyboardEvent) {
       const tempEdit = document.querySelector('input.temp-edit');
-      if (!visState.isEditMode || ev.key !== 'g' || isEditingLabel || tempEdit) return;
+      const tempEditFeatDetail = document.querySelector('input.temp-edit-feat-detail');
+      if (!visState.isEditMode || ev.key !== 'g' || tempEdit || tempEditFeatDetail) return;
       if (!visState.subgraph) return;
 
       if (visState.subgraph.activeGrouping.selectedNodeIds.size > 1) {

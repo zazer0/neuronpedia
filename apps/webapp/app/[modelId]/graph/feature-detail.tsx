@@ -166,7 +166,7 @@ export default function GraphFeatureDetail() {
                       e.preventDefault();
                     }
                   }}
-                  className="w-full flex-1 rounded border border-slate-300 px-2 py-0 text-xs placeholder:text-slate-300"
+                  className="temp-edit-feat-detail w-full flex-1 rounded border border-slate-300 px-2 py-0 text-xs placeholder:text-slate-300"
                 />
                 {getOriginalClerpForNode(node) && (
                   <div className="text-xs">
