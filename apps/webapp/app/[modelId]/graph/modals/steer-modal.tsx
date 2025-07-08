@@ -7,11 +7,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/s
 import { LoadingSquare } from '@/components/svg/loading-square';
 import { SteerLogitsRequest, SteerResponse, SteerResponseLogitsByToken } from '@/lib/utils/graph';
 import {
+  STEER_FREQUENCY_PENALTY_GRAPH,
+  STEER_N_COMPLETION_TOKENS_GRAPH,
   STEER_N_COMPLETION_TOKENS_MAX,
   STEER_N_COMPLETION_TOKENS_MAX_THINKING,
   STEER_SEED,
   STEER_STRENGTH_MAX,
   STEER_STRENGTH_MIN,
+  STEER_TEMPERATURE_GRAPH,
   STEER_TEMPERATURE_MAX,
 } from '@/lib/utils/steer';
 import * as Checkbox from '@radix-ui/react-checkbox';
@@ -279,10 +282,10 @@ export default function SteerModal() {
   const [steerResult, setSteerResult] = useState<SteerResponse | undefined>();
   const [isSteering, setIsSteering] = useState(false);
   const [steerLogitFeatures, setSteerLogitFeatures] = useState<SteerLogitFeature[]>([]);
-  const [steerTokens, setSteerTokens] = useState(10);
-  const [temperature, setTemperature] = useState(0.7);
+  const [steerTokens, setSteerTokens] = useState(STEER_N_COMPLETION_TOKENS_GRAPH);
+  const [temperature, setTemperature] = useState(STEER_TEMPERATURE_GRAPH);
   const [thinking] = useState(false);
-  const [freqPenalty, setFreqPenalty] = useState(0);
+  const [freqPenalty, setFreqPenalty] = useState(STEER_FREQUENCY_PENALTY_GRAPH);
   const [seed, setSeed] = useState(STEER_SEED);
   const [randomSeed, setRandomSeed] = useState(true);
   const [freezeAttention, setFreezeAttention] = useState(false);
@@ -292,9 +295,9 @@ export default function SteerModal() {
     setSteerResult(undefined);
     setIsSteering(false);
     setSteerLogitFeatures([]);
-    setSteerTokens(10);
-    setTemperature(0.7);
-    setFreqPenalty(0);
+    setSteerTokens(STEER_N_COMPLETION_TOKENS_GRAPH);
+    setTemperature(STEER_TEMPERATURE_GRAPH);
+    setFreqPenalty(STEER_FREQUENCY_PENALTY_GRAPH);
     setSeed(STEER_SEED);
     setRandomSeed(true);
     setFreezeAttention(false);
@@ -539,6 +542,9 @@ export default function SteerModal() {
                           nTokens: steerTokens,
                           topK: 5,
                           freezeAttention,
+                          temperature,
+                          freqPenalty,
+                          seed,
                         };
 
                         // Make the API request

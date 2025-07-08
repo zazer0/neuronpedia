@@ -7,6 +7,7 @@ This is the attribution graph generation server based on [circuit-tracer](https:
 - [Start Server](#start-server)
 - [Example Request - Output Graph JSON Directly](#example-request---output-graph-json-directly)
 - [Example Request - Output Graph JSON to S3 with presigned URL](#example-request---output-graph-json-to-s3-with-presigned-url)
+- [Example Request - Steering (Interventions) With Top Logits](#example-request---steering-interventions-with-top-logits)
 - [Runpod Serverless](#runpod-serverless)
 
 ### Install
@@ -99,6 +100,172 @@ curl -X POST http://localhost:5004/generate-graph \
     "max_feature_nodes" : 5000,
     "signed_url": S3_SIGNED_PUT_URL
   }'
+```
+
+### Example Request - Steering (Interventions) With Top Logits
+
+The following ablates a French feature and increases a Spanish feature by 150. It uses the activations from the specified prompt.
+It returns the top logits at each position for both the steered and default completions.
+The `top_k` field is the number of top logits to return per completion token.
+
+Request
+
+```
+curl -X POST http://localhost:5004/steer \
+  -H "Content-Type: application/json" \
+  -H "x-secret-key: YOUR_SECRET" \
+  -d '{
+    "model_id": "google/gemma-2-2b",
+    "prompt": "Fait: Michael Jordan joue au",
+    "features": [
+        {
+          "layer": 20,
+          "index": 1454,
+          "position": -1,
+          "ablate": true
+        },
+        {
+          "layer": 20,
+          "index": 341,
+          "position": -1,
+          "delta": 150
+        }
+    ],
+    "n_tokens": 10,
+    "top_k": 3,
+    "temperature": 0,
+    "freq_penalty": 0,
+    "freeze_attention": false
+  }'
+```
+
+Response (Arrays Truncated)
+
+```
+{
+  "DEFAULT_GENERATION": "Fait: Michael Jordan joue au basket avec son fils, Jeffrey Jordan, à la",
+  "STEERED_GENERATION": "Fait: Michael Jordan joue au baloncesto.\n\nFalso: Michael Jordan no juega",
+  "DEFAULT_LOGITS_BY_TOKEN": [
+    [
+      "F",
+      []
+    ],
+    [
+      "ait",
+      []
+    ],
+    [
+      ":",
+      []
+    ],
+    [
+      " Michael",
+      []
+    ],
+    [
+      " Jordan",
+      []
+    ],
+    [
+      " joue",
+      []
+    ],
+    [
+      " au",
+      [
+        [
+          " basket",
+          0.547155499458313
+        ],
+        [
+          " basketball",
+          0.1174481138586998
+        ],
+        [
+          " golf",
+          0.06529955565929413
+        ]
+      ]
+    ],
+    [
+      " basket",
+      [
+        [
+          " avec",
+          0.12210318446159363
+        ],
+        [
+          " depuis",
+          0.09880638122558594
+        ],
+        [
+          "-",
+          0.08087616413831711
+        ]
+      ]
+    ]
+  ],
+  "STEERED_LOGITS_BY_TOKEN": [
+    [
+      "F",
+      []
+    ],
+    [
+      "ait",
+      []
+    ],
+    [
+      ":",
+      []
+    ],
+    [
+      " Michael",
+      []
+    ],
+    [
+      " Jordan",
+      []
+    ],
+    [
+      " joue",
+      []
+    ],
+    [
+      " au",
+      [
+        [
+          " baloncesto",
+          0.3005445897579193
+        ],
+        [
+          " golf",
+          0.19333133101463318
+        ],
+        [
+          " basketball",
+          0.08585426211357117
+        ]
+      ]
+    ],
+    [
+      " baloncesto",
+      [
+        [
+          ".",
+          0.17341850697994232
+        ],
+        [
+          " en",
+          0.14220058917999268
+        ],
+        [
+          ",",
+          0.10603509098291397
+        ]
+      ]
+    ]
+  ]
+}
 ```
 
 ### Runpod Serverless

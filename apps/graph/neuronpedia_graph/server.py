@@ -142,11 +142,247 @@ class ForwardPassRequest(BaseModel):
     desired_logit_prob: float = 0.95
 
 
+class SteerFeature(BaseModel):
+    layer: int
+    position: int
+    index: int
+    ablate: bool = False
+    delta: float | None = None
+
+
+class SteerRequest(BaseModel):
+    model_id: str
+    prompt: str
+    features: list[SteerFeature]
+    n_tokens: int = 10
+    top_k: int = 5
+    temperature: float = 0.0
+    freq_penalty: float = 0
+    seed: int | None = None
+    # CHECK: does this do anything?
+    freeze_attention: bool = False
+
+
 @app.get("/check-busy")
 async def check_busy():
     """Check if the server is currently busy processing a request."""
     is_busy = request_lock.locked()
     return {"busy": is_busy}
+
+
+def get_topk(logits: torch.Tensor, tokenizer, k: int = 5):
+    probs = torch.softmax(logits.squeeze()[-1], dim=-1)
+    topk = torch.topk(probs, k)
+    return [
+        (tokenizer.decode([topk.indices[i]]), topk.values[i].item()) for i in range(k)
+    ]
+
+
+@app.post("/steer", dependencies=[Depends(verify_secret_key)])
+async def steer_handler(req: Request):
+    """Handle steer requests"""
+    print("========== Steer Start ==========")
+    print(
+        f"Thread {threading.get_ident()}: Received request. Attempting to acquire lock."
+    )
+    if not request_lock.acquire(blocking=False):
+        print(
+            f"Thread {threading.get_ident()}: Lock acquisition failed (busy). Rejecting request."
+        )
+        return JSONResponse(
+            content={"error": "Server busy, please try again later."}, status_code=503
+        )
+
+    print(f"Thread {threading.get_ident()}: Lock acquired.")
+    try:
+        request_body = await req.json()
+        req_data = SteerRequest.model_validate(request_body)
+
+        if req_data.model_id != loaded_model_arg:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Model '{req_data.model_id}' is not available. Only '{loaded_model_arg}' is currently loaded.",
+            )
+
+        # Validate that if ablate is True, delta must be 0
+        for feature in req_data.features:
+            if feature.ablate and feature.delta is not None:
+                return JSONResponse(
+                    content={"error": "When ablate is True, delta must be None"},
+                    status_code=400,
+                )
+            if not feature.ablate and feature.delta is None:
+                return JSONResponse(
+                    content={"error": "When ablate is False, delta must be provided"},
+                    status_code=400,
+                )
+
+        print(f"Received steer request: {req_data}")
+
+        _, activations = model.get_activations(req_data.prompt, sparse=True)
+
+        sequence_length = len(model.tokenizer(req_data.prompt).input_ids)
+        original_feature_pos = sequence_length - 1
+        open_ended_slice = slice(original_feature_pos, None, None)
+
+        # for all ablating, we set the activation to 0
+        ablate_features = [f for f in req_data.features if f.ablate]
+        print(f"Ablating features: {ablate_features}")
+        open_ended_intervention_tuples = [
+            (f.layer, open_ended_slice, f.index, 0.0) for f in ablate_features
+        ]
+
+        # for all steering, we set the activation to the delta
+        steer_features = [f for f in req_data.features if not f.ablate]
+        print(f"Steering features: {steer_features}")
+        open_ended_intervention_tuples += [
+            (
+                f.layer,
+                open_ended_slice,
+                f.index,
+                activations[(f.layer, f.position, f.index)] + f.delta
+                if f.delta is not None
+                else 0,
+            )
+            for f in steer_features
+        ]
+
+        hooks, _ = model._get_feature_intervention_hooks(
+            req_data.prompt,
+            open_ended_intervention_tuples,
+            freeze_attention=req_data.freeze_attention,
+        )
+
+        # set the seed
+        if req_data.seed is not None:
+            torch.manual_seed(req_data.seed)
+        default_generations = [
+            model.generate(
+                req_data.prompt,
+                do_sample=True,
+                use_past_kv_cache=False,
+                verbose=False,
+                max_new_tokens=req_data.n_tokens,
+                temperature=req_data.temperature,
+                freq_penalty=req_data.freq_penalty,
+            )
+        ]
+
+        # reset the seed
+        if req_data.seed is not None:
+            torch.manual_seed(req_data.seed)
+        with model.hooks(hooks):
+            steered_generations = [
+                model.generate(
+                    req_data.prompt,
+                    do_sample=True,
+                    use_past_kv_cache=False,
+                    verbose=False,
+                    max_new_tokens=req_data.n_tokens,
+                    temperature=req_data.temperature,
+                    freq_penalty=req_data.freq_penalty,
+                )
+            ]
+
+        default_generation = default_generations[0]
+        steered_generation = steered_generations[0]
+
+        default_tokenized = model.tokenizer.encode(
+            default_generation, add_special_tokens=False
+        )
+        default_tokenized = [
+            model.tokenizer.decode([token]) for token in default_tokenized
+        ]
+        steered_tokenized = model.tokenizer.encode(
+            steered_generation, add_special_tokens=False
+        )
+        steered_tokenized = [
+            model.tokenizer.decode([token]) for token in steered_tokenized
+        ]
+
+        # get the logits at each step
+        topk_default_by_token = []
+        topk_steered_by_token = []
+        intervention_tuples = [
+            (
+                f.layer,
+                original_feature_pos,
+                f.index,
+                activations[(f.layer, f.position, f.index)] + f.delta
+                if f.delta is not None
+                else 0,
+            )
+            for f in req_data.features
+        ]
+
+        with torch.inference_mode():
+            # iterate through the tokens and get the logits
+            for i in range(len(default_tokenized)):
+                # If we're still processing the original prompt tokens (before generation),
+                # append a blank item since we're only interested in generated tokens
+                if i < sequence_length - 2:
+                    topk_default_by_token.append(
+                        {"token": default_tokenized[i], "top_logits": []}
+                    )
+                    continue
+                combined_prompt = "".join(default_tokenized[: i + 1])
+                logits = model(combined_prompt)
+                # get the topk tokens
+                topk_default = get_topk(logits, model.tokenizer, req_data.top_k)
+                # each topk default should be an object of token, prob
+                topk_default_by_token.append(
+                    {
+                        "token": default_tokenized[i],
+                        "top_logits": [
+                            {"token": token, "prob": prob}
+                            for token, prob in topk_default
+                        ],
+                    }
+                )
+            for i in range(len(steered_tokenized)):
+                # If we're still processing the original prompt tokens (before generation),
+                # append a blank item since we're only interested in generated tokens
+                if i < sequence_length - 2:
+                    topk_steered_by_token.append(
+                        {"token": steered_tokenized[i], "top_logits": []}
+                    )
+                    continue
+                combined_prompt = "".join(steered_tokenized[: i + 1])
+                new_logits, _ = model.feature_intervention(
+                    combined_prompt, intervention_tuples
+                )
+                # get the topk tokens
+                topk_steered = get_topk(new_logits, model.tokenizer, req_data.top_k)
+                topk_steered_by_token.append(
+                    {
+                        "token": steered_tokenized[i],
+                        "top_logits": [
+                            {"token": token, "prob": prob}
+                            for token, prob in topk_steered
+                        ],
+                    }
+                )
+
+        print(f"Default generation: {default_generation}")
+        print(f"Steered generation: {steered_generation}")
+
+        response = {
+            "DEFAULT_LOGITS_BY_TOKEN": topk_default_by_token,
+            "STEERED_LOGITS_BY_TOKEN": topk_steered_by_token,
+            "DEFAULT_GENERATION": default_generation,
+            "STEERED_GENERATION": steered_generation,
+        }
+
+        return response
+
+    finally:
+        if request_lock.locked():
+            print(f"Thread {threading.get_ident()}: Releasing lock in finally block.")
+            request_lock.release()
+        else:
+            print(
+                f"Thread {threading.get_ident()}: Lock was not held by current path in finally block (already released or never acquired)."
+            )
 
 
 @app.post("/forward-pass", dependencies=[Depends(verify_secret_key)])

@@ -1,22 +1,22 @@
-import time
-import os
-import json
 import gc
-import requests
 import gzip
+import json
+import os
+import time
 from datetime import datetime, timezone
 
-from dotenv import load_dotenv
 import psutil
+import requests
 import torch
 from circuit_tracer.attribution import attribute, compute_salient_logits
+from circuit_tracer.graph import prune_graph
+from circuit_tracer.replacement_model import ReplacementModel
 from circuit_tracer.utils.create_graph_files import (
     build_model,
     create_nodes,
     create_used_nodes_and_edges,
 )
-from circuit_tracer.graph import prune_graph
-from circuit_tracer.replacement_model import ReplacementModel
+from dotenv import load_dotenv
 from pydantic import BaseModel, ValidationError
 from transformers import AutoTokenizer
 
@@ -38,7 +38,7 @@ tlens_model_name = "google/gemma-2-2b"
 loaded_scan = "gemma-2-2b"
 
 
-print(f"Loading model...")
+print("Loading model...")
 start_time = time.time()
 model = ReplacementModel.from_pretrained(tlens_model_name, transcoder_name)
 print(f"Model loaded in {time.time() - start_time:.2f} seconds")
@@ -79,16 +79,42 @@ class ForwardPassRequest(BaseModel):
     request_type: str = "forward_pass"
 
 
+class SteerFeature(BaseModel):
+    layer: int
+    position: int
+    index: int
+    ablate: bool = False
+    delta: float | None = None
+
+
+class SteerRequest(BaseModel):
+    model_id: str
+    prompt: str
+    features: list[SteerFeature]
+    n_tokens: int = 10
+    top_k: int = 5
+    temperature: float = 0.0
+    freq_penalty: float = 0
+    seed: int | None = None
+    # CHECK: does this do anything?
+    freeze_attention: bool = False
+    request_type: str = "steer"
+
+
 def check_deadline(deadline):
     """Check if request deadline has passed. Returns error dict if expired, None otherwise."""
     if deadline:
         current_timestamp = int(time.time())
         if current_timestamp > deadline:
-            deadline_utc = datetime.fromtimestamp(deadline, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
-            current_utc = datetime.fromtimestamp(current_timestamp, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
+            deadline_utc = datetime.fromtimestamp(deadline, tz=timezone.utc).strftime(
+                "%Y-%m-%d %H:%M:%S UTC"
+            )
+            current_utc = datetime.fromtimestamp(
+                current_timestamp, tz=timezone.utc
+            ).strftime("%Y-%m-%d %H:%M:%S UTC")
             delta_seconds = current_timestamp - deadline
             print(
-                f"ERROR: Request deadline already exceeded! Deadline='{deadline_utc}'," 
+                f"ERROR: Request deadline already exceeded! Deadline='{deadline_utc}',"
                 f"Current time='{current_utc}', Delta='{delta_seconds}' seconds past deadline"
             )
             return {
@@ -103,65 +129,65 @@ def check_deadline(deadline):
 def forward_pass_handler(event):
     """Handle forward pass requests to get salient logits"""
     print("========== Forward Pass Start ==========")
-    
+
     # Parse input
     try:
         input = ForwardPassRequest(**event["input"])
     except ValidationError as e:
         return {"error": str(e)}
-    
+
     try:
         # Check deadline first
         deadline_error = check_deadline(input.deadline)
         if deadline_error:
             return deadline_error
-            
+
         print(f"Received forward pass request: prompt='{input.prompt}'")
-        
+
         # Tokenize prompt
         tokens = model.tokenizer.encode(input.prompt, add_special_tokens=True)
         print(f"Tokens: {tokens}")
-        
+
         # Convert to tensor and run forward pass
         input_ids = torch.tensor([tokens])
-        
+
         with torch.no_grad():
             # Get model output
             output = model(input_ids)
             logits = output[0, -1, :]  # Get logits for last token
-            
+
             # Get unembedding matrix
             # Compute salient logits
             logit_indices, logit_probs, _ = compute_salient_logits(
                 logits,
                 model.unembed.W_U,
                 max_n_logits=input.max_n_logits,
-                desired_logit_prob=input.desired_logit_prob
+                desired_logit_prob=input.desired_logit_prob,
             )
-        
+
         # Decode tokens and create result
         results = []
         for idx, prob in zip(logit_indices.tolist(), logit_probs.tolist()):
             token = model.tokenizer.decode([idx])
-            results.append({
-                "token": token,
-                "token_id": idx,
-                "probability": float(prob)
-            })
-        
+            results.append(
+                {"token": token, "token_id": idx, "probability": float(prob)}
+            )
+
         # Also include some metadata
         response = {
             "prompt": input.prompt,
             "input_tokens": [model.tokenizer.decode([token]) for token in tokens],
             "salient_logits": results,
             "total_salient_tokens": len(results),
-            "cumulative_probability": float(logit_probs.sum())
+            "cumulative_probability": float(logit_probs.sum()),
         }
-        
-        print(f"Found {len(results)} salient tokens with cumulative prob: {response['cumulative_probability']:.4f}")
-        
+
+        print(
+            f"Found {len(results)} salient tokens with cumulative prob: {response['cumulative_probability']:.4f}"
+        )
+
         return response
-        
+
     except Exception as e:
         print(f"Error in forward pass: {str(e)}")
         return {"error": f"Forward pass failed: {str(e)}"}
@@ -169,16 +195,213 @@ def forward_pass_handler(event):
 
 def handler(event):
     """Main handler that routes based on request type"""
-    
+
     # Check request type
     request_type = event.get("input", {}).get("request_type", "graph")
-    
+
     if request_type == "forward_pass":
         return forward_pass_handler(event)
     elif request_type == "graph":
         return graph_generation_handler(event)
+    elif request_type == "steer":
+        return steer_handler(event)
     else:
         return {"error": f"Unknown request type: {request_type}"}
+
+
+def get_topk(logits: torch.Tensor, tokenizer, k: int = 5):
+    probs = torch.softmax(logits.squeeze()[-1], dim=-1)
+    topk = torch.topk(probs, k)
+    return [
+        (tokenizer.decode([topk.indices[i]]), topk.values[i].item()) for i in range(k)
+    ]
+
+
+def steer_handler(event):
+    """Handle steer requests"""
+    print("========== Steer Start ==========")
+    try:
+        req_data = SteerRequest(**event["input"])
+
+        # Validate that if ablate is True, delta must be 0
+        for feature in req_data.features:
+            if feature.ablate and feature.delta is not None:
+                return {"error": "When ablate is True, delta must be None"}
+            if not feature.ablate and feature.delta is None:
+                return {"error": "When ablate is False, delta must be provided"}
+
+    except ValidationError as e:
+        return {"error": str(e)}
+
+    try:
+        print(f"Received steer request with input: {req_data}")
+
+        _, activations = model.get_activations(req_data.prompt, sparse=True)
+
+        sequence_length = len(model.tokenizer(req_data.prompt).input_ids)
+        original_feature_pos = sequence_length - 1
+        open_ended_slice = slice(original_feature_pos, None, None)
+
+        # for all ablating, we set the activation to 0
+        ablate_features = [f for f in req_data.features if f.ablate]
+        print(f"Ablating features: {ablate_features}")
+        open_ended_intervention_tuples = [
+            (f.layer, open_ended_slice, f.index, 0.0) for f in ablate_features
+        ]
+
+        # for all steering, we set the activation to the delta
+        steer_features = [f for f in req_data.features if not f.ablate]
+        print(f"Steering features: {steer_features}")
+        open_ended_intervention_tuples += [
+            (
+                f.layer,
+                open_ended_slice,
+                f.index,
+                activations[(f.layer, f.position, f.index)] + f.delta
+                if f.delta is not None
+                else 0,
+            )
+            for f in steer_features
+        ]
+
+        hooks, _ = model._get_feature_intervention_hooks(
+            req_data.prompt,
+            open_ended_intervention_tuples,
+            freeze_attention=req_data.freeze_attention,
+        )
+
+        # set the seed
+        if req_data.seed is not None:
+            torch.manual_seed(req_data.seed)
+        default_generations = [
+            model.generate(
+                req_data.prompt,
+                do_sample=True,
+                use_past_kv_cache=False,
+                verbose=False,
+                max_new_tokens=req_data.n_tokens,
+                temperature=req_data.temperature,
+                freq_penalty=req_data.freq_penalty,
+            )
+        ]
+
+        # reset the seed
+        if req_data.seed is not None:
+            torch.manual_seed(req_data.seed)
+        with model.hooks(hooks):
+            steered_generations = [
+                model.generate(
+                    req_data.prompt,
+                    do_sample=True,
+                    use_past_kv_cache=False,
+                    verbose=False,
+                    max_new_tokens=req_data.n_tokens,
+                    temperature=req_data.temperature,
+                    freq_penalty=req_data.freq_penalty,
+                )
+            ]
+
+        default_generation = default_generations[0]
+        steered_generation = steered_generations[0]
+
+        default_tokenized = model.tokenizer.encode(
+            default_generation, add_special_tokens=False
+        )
+        default_tokenized = [
+            model.tokenizer.decode([token]) for token in default_tokenized
+        ]
+        steered_tokenized = model.tokenizer.encode(
+            steered_generation, add_special_tokens=False
+        )
+        steered_tokenized = [
+            model.tokenizer.decode([token]) for token in steered_tokenized
+        ]
+
+        # get the logits at each step
+        topk_default_by_token = []
+        topk_steered_by_token = []
+        intervention_tuples = [
+            (
+                f.layer,
+                original_feature_pos,
+                f.index,
+                activations[(f.layer, f.position, f.index)] + f.delta
+                if f.delta is not None
+                else 0,
+            )
+            for f in req_data.features
+        ]
+
+        with torch.inference_mode():
+            # iterate through the tokens and get the logits
+            for i in range(len(default_tokenized)):
+                # If we're still processing the original prompt tokens (before generation),
+                # append a blank item since we're only interested in generated tokens
+                if i < sequence_length - 2:
+                    topk_default_by_token.append(
+                        {"token": default_tokenized[i], "top_logits": []}
+                    )
+                    continue
+                combined_prompt = "".join(default_tokenized[: i + 1])
+                logits = model(combined_prompt)
+                # get the topk tokens
+                topk_default = get_topk(logits, model.tokenizer, req_data.top_k)
+                # each topk default should be an object of token, prob
+                topk_default_by_token.append(
+                    {
+                        "token": default_tokenized[i],
+                        "top_logits": [
+                            {"token": token, "prob": prob}
+                            for token, prob in topk_default
+                        ],
+                    }
+                )
+            for i in range(len(steered_tokenized)):
+                # If we're still processing the original prompt tokens (before generation),
+                # append a blank item since we're only interested in generated tokens
+                if i < sequence_length - 2:
+                    topk_steered_by_token.append(
+                        {"token": steered_tokenized[i], "top_logits": []}
+                    )
+                    continue
+                combined_prompt = "".join(steered_tokenized[: i + 1])
+                new_logits, _ = model.feature_intervention(
+                    combined_prompt, intervention_tuples
+                )
+                # get the topk tokens
+                topk_steered = get_topk(new_logits, model.tokenizer, req_data.top_k)
+                topk_steered_by_token.append(
+                    {
+                        "token": steered_tokenized[i],
+                        "top_logits": [
+                            {"token": token, "prob": prob}
+                            for token, prob in topk_steered
+                        ],
+                    }
+                )
+
+        print(f"Default generation: {default_generation}")
+        print(f"Steered generation: {steered_generation}")
+
+        response = {
+            "DEFAULT_LOGITS_BY_TOKEN": topk_default_by_token,
+            "STEERED_LOGITS_BY_TOKEN": topk_steered_by_token,
+            "DEFAULT_GENERATION": default_generation,
+            "STEERED_GENERATION": steered_generation,
+        }
+
+        return response
+
+    # no except since apparently runpod will handle it and return "error" in json
+
+    finally:
+        printMemory()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            print("Cleared CUDA cache")
+
+        gc.collect()
+        print("Cleared CPU memory")
 
 
 def graph_generation_handler(event):
@@ -248,7 +471,7 @@ def graph_generation_handler(event):
         )
         attribution_time_ms = (time.time() - attribution_start) * 1000
         print(f"Attribution Time: {attribution_time_ms:.2f}ms")
-        
+
         _graph.to("cuda")
 
         _node_mask, _edge_mask, _cumulative_scores = (
@@ -318,7 +541,7 @@ def graph_generation_handler(event):
         model_json = json.dumps(model_dict)
 
         print(f"Uploading file to url: {signed_url}")
-        
+
         # Handle compression if requested
         compress_time_ms = 0
         if input.compress:
@@ -326,17 +549,14 @@ def graph_generation_handler(event):
             compress_start = time.time()
             data_to_upload = gzip.compress(model_json.encode("utf-8"), compresslevel=3)
             compress_time_ms = (time.time() - compress_start) * 1000
-            headers = {
-                "Content-Type": "application/json",
-                "Content-Encoding": "gzip"
-            }
+            headers = {"Content-Type": "application/json", "Content-Encoding": "gzip"}
         else:
             data_to_upload = model_json.encode("utf-8")
             headers = {"Content-Type": "application/json"}
-        
+
         # Track upload size
         upload_size_bytes = len(data_to_upload)
-        
+
         # Start upload timing
         upload_start = time.time()
         response = requests.put(
@@ -352,27 +572,29 @@ def graph_generation_handler(event):
             return {"error": "Failed to upload file"}
 
         print(f"File: uploaded successfully to url: {signed_url}")
-        
+
         # Total time
         total_time_ms = (time.time() - total_start_time) * 1000
-        
+
         # Log timing summary
         timing_parts = [
             f"attribution_ms={attribution_time_ms:.0f}",
             f"upload_ms={upload_time_ms:.0f}",
             f"upload_size_bytes={upload_size_bytes}",
             f"upload_size_mb={upload_size_bytes / (1024 * 1024):.2f}",
-            f"total_ms={total_time_ms:.0f}"
+            f"total_ms={total_time_ms:.0f}",
         ]
-        
+
         if input.compress:
-            timing_parts.extend([
-                f"compress_ms={compress_time_ms:.0f}",
-                f"compression_ratio={len(model_json.encode('utf-8')) / upload_size_bytes:.2f}"
-            ])
-        
+            timing_parts.extend(
+                [
+                    f"compress_ms={compress_time_ms:.0f}",
+                    f"compression_ratio={len(model_json.encode('utf-8')) / upload_size_bytes:.2f}",
+                ]
+            )
+
         print(f"TIMING_SUMMARY: {' '.join(timing_parts)}")
-        
+
         return {"success": f"File: uploaded successfully to url: {signed_url}"}
 
     # no except since apparently runpod will handle it and return "error" in json
@@ -392,4 +614,5 @@ def graph_generation_handler(event):
 # Start the Serverless function when the script is run
 if __name__ == "__main__":
     import runpod
+
     runpod.serverless.start({"handler": handler})

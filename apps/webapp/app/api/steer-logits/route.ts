@@ -9,9 +9,19 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
 
   const validatedBody = SteerLogitsRequestSchema.validateSync(body);
 
-  const { modelId, prompt, features, nTokens, topK, freezeAttention } = validatedBody;
+  const { modelId, prompt, features, nTokens, topK, freezeAttention, temperature, freqPenalty, seed } = validatedBody;
 
-  const response = await steerLogits(modelId, prompt, features, nTokens, topK, freezeAttention);
+  const response = await steerLogits(
+    modelId,
+    prompt,
+    features,
+    nTokens,
+    topK,
+    freezeAttention,
+    temperature,
+    freqPenalty,
+    seed,
+  );
 
   return NextResponse.json(response);
 });

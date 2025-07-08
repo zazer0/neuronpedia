@@ -9,8 +9,14 @@ import {
 import * as yup from 'yup';
 import {
   STEER_FREEZE_ATTENTION,
+  STEER_FREQUENCY_PENALTY,
+  STEER_FREQUENCY_PENALTY_MAX,
+  STEER_FREQUENCY_PENALTY_MIN,
   STEER_N_COMPLETION_TOKENS,
   STEER_N_COMPLETION_TOKENS_MAX,
+  STEER_SEED,
+  STEER_TEMPERATURE,
+  STEER_TEMPERATURE_MAX,
   STEER_TOPK_LOGITS,
   STEER_TOPK_LOGITS_MAX,
 } from './steer';
@@ -271,6 +277,13 @@ export const SteerLogitsRequestSchema = yup.object({
   nTokens: yup.number().default(STEER_N_COMPLETION_TOKENS).min(1).max(STEER_N_COMPLETION_TOKENS_MAX),
   topK: yup.number().default(STEER_TOPK_LOGITS).min(0).max(STEER_TOPK_LOGITS_MAX),
   freezeAttention: yup.boolean().default(STEER_FREEZE_ATTENTION),
+  temperature: yup.number().default(STEER_TEMPERATURE).min(0.0).max(STEER_TEMPERATURE_MAX),
+  freqPenalty: yup
+    .number()
+    .default(STEER_FREQUENCY_PENALTY)
+    .min(STEER_FREQUENCY_PENALTY_MIN)
+    .max(STEER_FREQUENCY_PENALTY_MAX),
+  seed: yup.number().default(STEER_SEED).nullable(),
 });
 
 export type SteerLogitsRequest = yup.InferType<typeof SteerLogitsRequestSchema>;
@@ -313,6 +326,9 @@ export const steerLogits = async (
   nTokens: number,
   topK: number,
   freezeAttention: boolean,
+  temperature: number,
+  freqPenalty: number,
+  seed: number | null,
 ) => {
   let response;
   // TODO: clean up model id usage
@@ -326,7 +342,10 @@ export const steerLogits = async (
     n_tokens: nTokens,
     top_k: topK,
     freeze_attention: freezeAttention,
-    request_type: 'steer',
+    request_type: 'steer', // for Runpod
+    temperature,
+    freq_penalty: freqPenalty,
+    seed,
   };
   if (USE_RUNPOD_GRAPH) {
     response = await fetch(`${GRAPH_RUNPOD_SERVER}/runsync`, {
