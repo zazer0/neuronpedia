@@ -12,7 +12,7 @@ imagePreview: ASSET_BASE_URL/blog/neuronpedia-is-now-open-source-preview.gif
 Podcast Summary by NotebookLM - [[Apple]](https://podcasts.apple.com/us/podcast/the-babble-a-residual-stream-podcast/id1809283401?i=1000703948045) [[Spotify]](https://creators.spotify.com/pod/show/neuronpedia/episodes/Ep--2-A-Bunch-of-Updates-e31nm2b)
 
 - Get started on running Neuronpedia: [GitHub](https://github.com/hijohnnylin/neuronpedia) or [Instant Deploy](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fhijohnnylin%2Fneuronpedia&env=NEXT_PUBLIC_SITE_NAME_VERCEL_DEPLOY&envDescription=***Your%20Custom%20Website%20Name.%20For%20example%3A%20PuppyNeurons***&root-directory=apps/webapp&build-command=npx%20prisma%20generate%20%26%26%20npm%20run%20build%3Ademo&project-name=my-neuronpedia&repository-name=my-neuronpedia&demo-title=Neuronpedia&demo-description=Deploy%20your%20own%20custom%20Neuronpedia%20%F0%9F%9A%80%F0%9F%A7%A0%F0%9F%A7%90&demo-url=https%3A%2F%2Fneuronpedia.org)
-- Download 4+ terabytes of interpretability data: [Public Datasets](ASSET_BASE_URL/index.html?prefix=v1/)
+- Download 4+ terabytes of interpretability data: [Public Datasets](https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1)
 - Review [a summary](#current-capabilities) of Neuronpedia's features and submit [feature requests](https://github.com/hijohnnylin/neuronpedia/issues).
 - Reach out to us via [Slack #neuronpedia](https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-375zalm04-GFd5tdBU1yLKlu_T_JSqZQ), [email](mailto:johnny@neuronpedia.org), or [GitHub Issues](https://github.com/hijohnnylin/neuronpedia/issues)
 - Check out the [tweet thread](https://x.com/neuronpedia/status/1906793456879775745) with demos
@@ -127,7 +127,7 @@ We're currently working on porting our TODOs and roadmap from our private task m
 
 ## New: Global Datasets - Export and Import (WIP)
 
-Let's say you came up with a new type of sparse coder, called the Sparse PuppyEncoder (SPE), and you want to not only [host it yourself](#new-host-neuronpedia-yourself), but also to let others load Sparse PuppyEncoders (and your generated data) into _their own_ local Neuronpedia and tinker with it? You can do that, too - just use the `neuronpedia-utils` export tools to export your activations, explanations, and metadata. Then, we upload your data to the public [neuronpedia-datasets](ASSET_BASE_URL/index.html?prefix=v1/), so that anyone running a local instance can import it.
+Let's say you came up with a new type of sparse coder, called the Sparse PuppyEncoder (SPE), and you want to not only [host it yourself](#new-host-neuronpedia-yourself), but also to let others load Sparse PuppyEncoders (and your generated data) into _their own_ local Neuronpedia and tinker with it? You can do that, too - just use the `neuronpedia-utils` export tools to export your activations, explanations, and metadata. Then, we upload your data to the public [neuronpedia-datasets](https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1), so that anyone running a local instance can import it.
 
 Here's importing datasets from the global Neuronpedia bucket to a localhost instance:
 
@@ -157,7 +157,7 @@ All documention for getting started is in the READMEs in our public repository. 
   - Neuronpedia is a monorepo with multiple services and packages
   - Multiple tutorials / methods for setting it up, depending on your level of customization
   - Demo environment is publicly available to connect to (database, inference instances)
-- [Datasets (4+ TB)](ASSET_BASE_URL/index.html?prefix=v1/)
+- [Datasets (4+ TB)](https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1)
   - Includes all current public Neuronpedia data
   - 11 models
   - 60+ million latents/features/concepts, 50+ million explanations, 3+ billion activations
