@@ -164,9 +164,6 @@ function NodeToSteer({
               defaultChecked
               checked={findSelectedFeature(layer, index)?.ablate || false}
               onCheckedChange={(e) => {
-                if (e === true) {
-                  alert('Warning: Ablation is not working properly.');
-                }
                 const newAblateState = e === true;
                 const foundSelectedFeature = findSelectedFeature(layer, index);
                 if (foundSelectedFeature) {
